@@ -33,7 +33,7 @@
       '<div class="meta">' +
       '<span>📅 ' + esc(H.tglPanjang(k.tanggal, true)) + (k.waktu ? ', ' + esc(k.waktu) : '') + '</span>' +
       (k.tempat ? '<span>📍 ' + esc(k.tempat) + '</span>' : '') +
-      (k.narasumber ? '<span>🎤 ' + esc(k.narasumber) + '</span>' : '') +
+      (k.narasumber ? '<span>🎤 ' + H.narasumberHtml(k.narasumber) + '</span>' : '') +
       '</div></section>';
   }
 
@@ -75,6 +75,9 @@
       '<div id="blok-isian" class="mt"></div>' +
       '<div id="blok-akhir" hidden>' +
       '<div id="pratinjau-nama"></div>' +
+      (k.wajibKode ? '<label class="f"><span>🔐 Kode kehadiran <i>*</i></span>' +
+        '<input type="text" id="kode-hadir" inputmode="numeric" maxlength="4" autocomplete="off" placeholder="4 angka" style="font-size:22px;letter-spacing:8px;text-align:center;font-weight:700">' +
+        '<small>Kode diumumkan panitia di ruangan atau di layar Zoom selama kegiatan.</small></label>' : '') +
       '<label class="f"><span>Tanda tangan <i>*</i></span></label>' +
       '<div class="ttd-kotak" id="ttd-kotak"><canvas id="ttd"></canvas><div class="garis-ttd"></div><div class="petunjuk" id="ttd-petunjuk">✍️ Tanda tangan di sini</div></div>' +
       '<div class="baris antara" style="margin:6px 0 16px"><span class="kecil">Gunakan jari atau mouse.</span><button type="button" class="tbl garis kecil" id="ttd-ulang">↺ Ulangi</button></div>' +
@@ -307,13 +310,20 @@
     if (data.email && !/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(data.email)) return H.toast('Format email tidak valid.', true);
     var butuhEmail = st.kategori === 'CI' || st.kategori === 'UMUM' || (st.kategori === 'STAF' && !st.pakaiSso && !(st.staf && st.staf.emailSamar));
     if (butuhEmail && KEG.modeSertifikat !== 'tanpa' && !data.email) return H.toast('Email wajib diisi agar sertifikat dapat dikirim.', true);
+    if (KEG.wajibKode) {
+      data.kodeHadir = ($('kode-hadir').value || '').replace(/\D/g, '');
+      if (data.kodeHadir.length !== 4) { $('kode-hadir').focus(); return H.toast('Masukkan 4 angka kode kehadiran.', true); }
+    }
     if (!pad || pad.kosong()) return H.toast('Silakan tanda tangan dulu.', true);
     data.ttd = pad.dataUrl();
 
     var btn = $('kirim'); btn.disabled = true; btn.innerHTML = '<span class="putar kcl"></span> Mengirim…';
     try {
       var d = await H.api('hadir', data, opsi);
-      if (!d.ok) { $('pesan').innerHTML = '<div class="pesan galat">' + esc(d.pesan) + '</div>'; window.scrollTo({ top: 0, behavior: 'smooth' }); return; }
+      if (!d.ok) {
+        if (d.kode === 'KODE' && $('kode-hadir')) { H.toast(d.pesan, true); $('kode-hadir').value = ''; $('kode-hadir').focus(); return; }
+        $('pesan').innerHTML = '<div class="pesan galat">' + esc(d.pesan) + '</div>'; window.scrollTo({ top: 0, behavior: 'smooth' }); return;
+      }
       simpanTerakhir(d);
       tampilSukses(d, false);
     } catch (err) { H.toast(err.message, true); }

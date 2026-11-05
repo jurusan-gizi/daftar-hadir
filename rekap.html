@@ -16,13 +16,8 @@
     .alat select, .alat button { font: inherit; padding: 7px 10px; border-radius: 8px; border: 1px solid #CBD5E1; background: #fff; }
     .alat button.utama { background: #00B8AD; color: #fff; border-color: #00B8AD; font-weight: 600; cursor: pointer; }
     .kertas { background: #fff; width: 210mm; min-height: 297mm; margin: 16px auto; padding: 14mm; box-shadow: 0 4px 20px rgba(0,0,0,.12); }
-    .kop { display: flex; align-items: center; gap: 14px; border-bottom: 3px double #000; padding-bottom: 8px; }
-    .kop img { height: 17mm; width: auto; }
-    .kop .teks { flex: 1; text-align: center; line-height: 1.25; }
-    .kop .teks .k1 { font-size: 11pt; }
-    .kop .teks .k2 { font-size: 13pt; font-weight: bold; text-transform: uppercase; }
-    .kop .teks .k3 { font-size: 12pt; font-weight: bold; text-transform: uppercase; }
-    .kop .teks .k4 { font-size: 8.5pt; }
+    .kop { margin-bottom: 4px; }
+    .kop img { width: 100%; height: auto; display: block; }
     h1 { text-align: center; font-size: 13pt; margin: 14px 0 2px; letter-spacing: 1px; }
     .subjudul { text-align: center; font-weight: bold; margin: 0 0 10px; }
     table.info { border-collapse: collapse; margin: 0 0 10px; font-size: 10.5pt; }
@@ -92,19 +87,14 @@
           '<td class="ttd ' + sisi + '"><div class="isi"><span class="n">' + no + '.</span>' + (x.ttd ? '<img src="' + x.ttd + '" alt="">' : '') + '</div></td></tr>';
       }).join('');
       kertas.innerHTML =
-        '<div class="kop"><img src="logo.png" alt="">' +
-        '<div class="teks"><div class="k1">' + esc(I.kementerian || '') + '</div>' +
-        '<div class="k1">' + esc(I.direktorat || '') + '</div>' +
-        '<div class="k2">' + esc(I.nama || '') + '</div>' +
-        '<div class="k3">' + esc(p.unit || 'Jurusan Gizi') + '</div>' +
-        '<div class="k4">' + esc((I.alamat || []).join(', ')) + (I.telepon ? ' · Telp. ' + esc(I.telepon) : '') + (I.website ? ' · ' + esc(I.website.replace(/^https?:\/\//, '')) : '') + '</div></div></div>' +
-        '<h1>DAFTAR HADIR</h1><p class="subjudul">' + esc(keg.nama) + '</p>' +
+        '<div class="kop"><img src="kop.png" alt="Kop Kementerian Kesehatan - Politeknik Kesehatan Makassar"></div>' +
+        '<h1>DAFTAR HADIR</h1><p class="subjudul">' + esc(keg.nama) + '<br>' + esc(p.unit || 'Jurusan Gizi') + '</p>' +
         '<table class="info">' +
         (keg.jenis ? '<tr><td>Jenis Kegiatan</td><td>:</td><td>' + esc(keg.jenis) + '</td></tr>' : '') +
         '<tr><td>Hari/Tanggal</td><td>:</td><td>' + esc(H.tglPanjang(keg.tanggal, true)) + '</td></tr>' +
         (keg.waktu ? '<tr><td>Waktu</td><td>:</td><td>' + esc(keg.waktu) + '</td></tr>' : '') +
         (keg.tempat ? '<tr><td>Tempat</td><td>:</td><td>' + esc(keg.tempat) + '</td></tr>' : '') +
-        (keg.narasumber ? '<tr><td>Narasumber</td><td>:</td><td>' + esc(keg.narasumber) + '</td></tr>' : '') +
+        (keg.narasumber ? '<tr><td>Narasumber</td><td>:</td><td>' + H.narasumberHtml(keg.narasumber) + '</td></tr>' : '') +
         (keg.penyelenggara ? '<tr><td>Penyelenggara</td><td>:</td><td>' + esc(keg.penyelenggara) + '</td></tr>' : '') +
         '</table>' +
         '<table class="dh"><thead><tr><th>No</th><th>Nama</th><th>NIM / NIP / NIK</th><th>Prodi / Instansi</th><th>Tanda Tangan</th></tr></thead><tbody>' +

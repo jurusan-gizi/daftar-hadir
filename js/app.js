@@ -180,6 +180,9 @@
         return '<label><input type="radio" name="mode" value="' + m[0] + '"' + (k.modeSertifikat === m[0] ? ' checked' : '') + '> ' + m[1] + '</label>';
       }).join('') + '</div>' +
       '<p class="kecil" style="margin:0 0 16px">PDF sertifikat dari SRIKANDI diunggah di tab <b>Sertifikat</b> setelah kegiatan disimpan.</p>' +
+      '<label class="f"><span>Pengamanan</span></label>' +
+      '<div class="pilihan" style="margin-bottom:4px"><label><input type="checkbox" id="f-kode"' + (baru || k.wajibKode ? ' checked' : '') + '> 🔐 Wajib kode kehadiran</label></div>' +
+      '<p class="kecil" style="margin:0 0 16px">Kode 4 angka diumumkan panitia di ruangan / layar Zoom. Orang yang hanya menerima link tanpa hadir tidak dapat mengisi.</p>' +
       '<button class="tbl penuh" id="f-simpan" type="submit">' + (baru ? 'Simpan & Lanjut' : 'Simpan Perubahan') + '</button>' +
       '</form>';
 
@@ -197,7 +200,8 @@
         tanggal: $('f-tgl').value, waktu: $('f-waktu').value, tempat: $('f-tempat').value, narasumber: $('f-nara').value,
         sasaran: [].map.call(document.querySelectorAll('#f-sasaran input:checked'), function (x) { return x.value; }),
         bukaAbsen: $('f-buka').value, tutupAbsen: $('f-tutup').value,
-        modeSertifikat: (document.querySelector('#f-mode input:checked') || {}).value || 'tanpa'
+        modeSertifikat: (document.querySelector('#f-mode input:checked') || {}).value || 'tanpa',
+        wajibKode: $('f-kode').checked
       };
       if (data.nama.trim().length < 3) return H.toast('Nama kegiatan wajib diisi.', true);
       if (!data.tanggal) return H.toast('Tanggal kegiatan wajib diisi.', true);
@@ -225,14 +229,18 @@
       '<p style="margin:0 0 4px;opacity:.85">' + esc(k.jenis || 'Kegiatan') + (k.penyelenggara ? ' · ' + esc(k.penyelenggara) : '') + '</p>' +
       '<h1>' + esc(k.nama) + '</h1><div class="meta">' +
       '<span>📅 ' + esc(H.tglPanjang(k.tanggal, true)) + (k.waktu ? ', ' + esc(k.waktu) : '') + '</span>' +
-      (k.tempat ? '<span>📍 ' + esc(k.tempat) + '</span>' : '') + (k.narasumber ? '<span>🎤 ' + esc(k.narasumber) + '</span>' : '') +
+      (k.tempat ? '<span>📍 ' + esc(k.tempat) + '</span>' : '') + (k.narasumber ? '<span>🎤 ' + H.narasumberHtml(k.narasumber) + '</span>' : '') +
       '<span>👥 ' + k.sasaran.map(function (s) { return esc(H.SASARAN[s]); }).join(', ') + '</span></div></section>' +
       '<div class="kartu"><div class="baris antara"><div>' + H.labelAbsen(k.absen) +
       ' <span class="kecil">' + (k.bukaAbsen ? 'Buka ' + esc(H.waktuPanjang(k.bukaAbsen)) : 'Buka langsung') + ' · ' +
       (k.tutupAbsen ? 'Tutup ' + esc(H.waktuPanjang(k.tutupAbsen)) : 'tutup manual') + '</span></div>' +
       '<div class="pilihan" id="status-absen">' + [['otomatis', 'Ikuti jadwal'], ['buka', 'Buka sekarang'], ['tutup', 'Tutup sekarang']].map(function (s) {
         return '<label><input type="radio" name="sa" value="' + s[0] + '"' + (k.statusAbsen === s[0] ? ' checked' : '') + '> ' + s[1] + '</label>';
-      }).join('') + '</div></div></div>' +
+      }).join('') + '</div></div>' +
+      (k.wajibKode ? '<div class="garis-atas baris antara"><div><span class="kecil">🔐 Kode kehadiran — umumkan di ruangan / layar Zoom, jangan dibagikan di grup</span>' +
+        '<div style="font-size:34px;font-weight:800;letter-spacing:8px;color:var(--teal-tua);line-height:1.2" id="kode-tampil">' + esc(k.kodeHadir) + '</div></div>' +
+        '<div class="baris"><button class="tbl" id="kode-layar">🖥️ Tampilkan layar penuh</button><button class="tbl garis" id="kode-ganti">🔄 Ganti kode</button></div></div>' : '') +
+      '</div>' +
       '<div class="tab" id="tab">' + tabs.map(function (t) { return '<button data-t="' + t[0] + '"' + (t[0] === tab ? ' class="aktif"' : '') + '>' + t[1] + '</button>'; }).join('') + '</div>' +
       '<div id="isi-tab"></div>';
 
@@ -244,6 +252,13 @@
         await segarkan(); H.toast('Status absen diperbarui.'); rute();
       } catch (err) { H.toast(err.message, true); }
     };
+    if ($('kode-layar')) $('kode-layar').onclick = function () { layarKode(cariKeg(k.id)); };
+    if ($('kode-ganti')) $('kode-ganti').onclick = async function () {
+      if (!await H.konfirmasi('Ganti kode kehadiran?', 'Kode lama langsung tidak berlaku. Umumkan kode baru kepada peserta yang hadir.', 'Ganti kode')) return;
+      var r = await H.api('gantiKode', { k: k.id });
+      if (!r.ok) return H.toast(r.pesan, true);
+      await segarkan(); $('kode-tampil').textContent = r.kodeHadir; H.toast('Kode baru: ' + r.kodeHadir);
+    };
     if ($('hapus-keg')) $('hapus-keg').onclick = async function () {
       if (!await H.konfirmasi('Hapus kegiatan?', 'Kegiatan <b>' + esc(k.nama) + '</b> akan disembunyikan dari aplikasi. Data kehadiran tetap tersimpan di Google Sheet.', 'Hapus', true)) return;
       var r = await H.api('hapusKegiatan', { k: k.id });
@@ -254,10 +269,28 @@
     ({ bagikan: tabBagikan, peserta: tabPeserta, sertifikat: tabSertifikat, rekap: tabRekap }[tab] || tabBagikan)(k);
   }
 
+  /** Kode kehadiran ukuran besar untuk ditayangkan di proyektor / share screen Zoom. */
+  function layarKode(k) {
+    var l = document.createElement('div');
+    l.style.cssText = 'position:fixed;inset:0;z-index:80;background:linear-gradient(135deg,#00B8AD,#007F7F);color:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:24px;cursor:pointer';
+    l.innerHTML = '<img src="logo.png" alt="" style="height:70px;background:#fff;border-radius:14px;padding:8px 14px;margin-bottom:28px">' +
+      '<div style="font-size:clamp(18px,3vw,30px);font-weight:600;opacity:.9;max-width:90vw">' + esc(k.nama) + '</div>' +
+      '<div style="font-size:clamp(16px,2.2vw,24px);margin-top:26px;opacity:.85">KODE KEHADIRAN</div>' +
+      '<div style="font-size:clamp(90px,22vw,260px);font-weight:800;letter-spacing:.12em;line-height:1;margin:6px 0 18px;text-shadow:0 6px 30px rgba(0,0,0,.2)">' + esc(k.kodeHadir) + '</div>' +
+      '<div style="font-size:clamp(14px,2vw,22px);background:rgba(255,255,255,.15);padding:10px 22px;border-radius:999px">Buka link daftar hadir → masukkan kode ini</div>' +
+      '<div style="position:absolute;bottom:18px;font-size:13px;opacity:.7">Klik di mana saja atau tekan Esc untuk menutup</div>';
+    function tutup() { if (document.fullscreenElement) document.exitFullscreen().catch(function () { }); l.remove(); document.removeEventListener('keydown', esc_); }
+    function esc_(e) { if (e.key === 'Escape') tutup(); }
+    l.onclick = tutup; document.addEventListener('keydown', esc_);
+    document.body.appendChild(l);
+    if (l.requestFullscreen) l.requestFullscreen().catch(function () { });
+  }
+
   /* ---------- Tab: Bagikan ---------- */
   function teksUndangan(k, link) {
     return '*DAFTAR HADIR*\n' + k.nama + '\n📅 ' + H.tglPanjang(k.tanggal, true) + (k.waktu ? ', ' + k.waktu : '') +
       (k.tempat ? '\n📍 ' + k.tempat : '') + '\n\nSilakan isi daftar hadir melalui link berikut:\n' + link +
+      (k.wajibKode ? '\n\n🔐 Siapkan *kode kehadiran* yang akan diumumkan panitia selama kegiatan.' : '') +
       (k.tutupAbsen ? '\n\nDaftar hadir ditutup ' + H.waktuPanjang(k.tutupAbsen) + '.' : '');
   }
 

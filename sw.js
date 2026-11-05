@@ -1,7 +1,7 @@
 /* Service worker: tampilan aplikasi tetap terbuka saat sinyal lemah. Data selalu diambil dari server. */
-var CACHE = 'daftar-hadir-v1';
+var CACHE = 'daftar-hadir-v2';
 var SHELL = [
-  './', 'index.html', 'hadir.html', 'sertifikat.html', 'rekap.html', 'logo.png', 'manifest.webmanifest',
+  './', 'index.html', 'hadir.html', 'sertifikat.html', 'rekap.html', 'logo.png', 'kop.png', 'manifest.webmanifest',
   'css/style.css', 'js/config.js', 'js/umum.js', 'js/ttd.js', 'js/hadir.js', 'js/app.js',
   'vendor/pdf-lib.min.js', 'vendor/qrcode.js', 'vendor/xlsx.mini.min.js', 'vendor/pdf.min.js', 'vendor/pdf.worker.min.js',
   'icons/icon-192.png', 'icons/icon-512.png'

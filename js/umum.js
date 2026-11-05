@@ -110,6 +110,11 @@
     return j ? j.slice(0, 5).replace(':', '.') : '';
   }
 
+  /** "1. A 2. B 3. C" → baris terpisah (HTML aman). */
+  function narasumberHtml(t) {
+    return String(t || '').split(/\s+(?=\d{1,2}[.)]\s)/).map(esc).join('<br>');
+  }
+
   function labelAbsen(s) {
     return { buka: '<span class="lbl buka">Absen dibuka</span>', belum: '<span class="lbl belum">Belum dibuka</span>', tutup: '<span class="lbl tutup">Ditutup</span>' }[s] || '';
   }
@@ -235,7 +240,7 @@
   w.Hadir = {
     CFG: CFG, SASARAN: SASARAN, PRODI_MHS: PRODI_MHS, JENIS: JENIS, POSISI_BAWAAN: POSISI_BAWAAN,
     $: $, esc: esc, api: api, toast: toast, dialog: dialog, konfirmasi: konfirmasi,
-    tglPanjang: tglPanjang, waktuPanjang: waktuPanjang, jam: jam, labelAbsen: labelAbsen, labelMode: labelMode,
+    narasumberHtml: narasumberHtml, tglPanjang: tglPanjang, waktuPanjang: waktuPanjang, jam: jam, labelAbsen: labelAbsen, labelMode: labelMode,
     namaSertifikat: namaSertifikat, buatSertifikat: buatSertifikat, base64KeBytes: base64KeBytes, bytesKeBase64: bytesKeBase64,
     unduhBytes: unduhBytes, namaFile: namaFile, linkHadir: linkHadir, linkSertifikat: linkSertifikat, qrDataUrl: qrDataUrl
   };
