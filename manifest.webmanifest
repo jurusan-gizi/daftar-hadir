@@ -1,0 +1,16 @@
+{
+  "name": "Daftar Hadir Kegiatan · Jurusan Gizi",
+  "short_name": "Daftar Hadir",
+  "description": "Daftar hadir kegiatan Jurusan Gizi Poltekkes Kemenkes Makassar dengan tanda tangan dan sertifikat.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#FFFFFF",
+  "theme_color": "#00B8AD",
+  "lang": "id",
+  "icons": [
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "icons/maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

@@ -1,0 +1,123 @@
+<!doctype html>
+<html lang="id">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Rekap Daftar Hadir</title>
+  <link rel="icon" href="icons/icon-192.png">
+  <script src="js/config.js"></script>
+  <script src="https://jurusan-gizi.github.io/sso.js"></script>
+  <style>
+    @page { size: A4 portrait; margin: 14mm 14mm 16mm; }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: #E9EEF1; font-family: Arial, Helvetica, sans-serif; color: #000; font-size: 11pt; }
+    .alat { position: sticky; top: 0; z-index: 5; background: #fff; border-bottom: 3px solid #00B8AD; padding: 10px 16px; display: flex; gap: 10px; flex-wrap: wrap; align-items: center; font-family: system-ui, sans-serif; font-size: 14px; }
+    .alat b { color: #007F7F; margin-right: auto; }
+    .alat select, .alat button { font: inherit; padding: 7px 10px; border-radius: 8px; border: 1px solid #CBD5E1; background: #fff; }
+    .alat button.utama { background: #00B8AD; color: #fff; border-color: #00B8AD; font-weight: 600; cursor: pointer; }
+    .kertas { background: #fff; width: 210mm; min-height: 297mm; margin: 16px auto; padding: 14mm; box-shadow: 0 4px 20px rgba(0,0,0,.12); }
+    .kop { display: flex; align-items: center; gap: 14px; border-bottom: 3px double #000; padding-bottom: 8px; }
+    .kop img { height: 17mm; width: auto; }
+    .kop .teks { flex: 1; text-align: center; line-height: 1.25; }
+    .kop .teks .k1 { font-size: 11pt; }
+    .kop .teks .k2 { font-size: 13pt; font-weight: bold; text-transform: uppercase; }
+    .kop .teks .k3 { font-size: 12pt; font-weight: bold; text-transform: uppercase; }
+    .kop .teks .k4 { font-size: 8.5pt; }
+    h1 { text-align: center; font-size: 13pt; margin: 14px 0 2px; letter-spacing: 1px; }
+    .subjudul { text-align: center; font-weight: bold; margin: 0 0 10px; }
+    table.info { border-collapse: collapse; margin: 0 0 10px; font-size: 10.5pt; }
+    table.info td { padding: 1px 6px 1px 0; vertical-align: top; }
+    table.info td:first-child { width: 32mm; }
+    table.dh { width: 100%; border-collapse: collapse; font-size: 10pt; }
+    table.dh th, table.dh td { border: 1px solid #000; padding: 3px 5px; vertical-align: middle; }
+    table.dh th { background: #DFF3F1; text-align: center; font-size: 9.5pt; }
+    table.dh td.no { text-align: center; width: 9mm; }
+    table.dh td.ttd { width: 52mm; height: 13mm; padding: 1px 3px; }
+    table.dh td.ttd .isi { display: flex; align-items: flex-start; gap: 2px; height: 12mm; }
+    table.dh td.ttd .n { font-size: 8pt; min-width: 5mm; }
+    table.dh td.ttd img { max-height: 11.5mm; max-width: 20mm; display: block; }
+    table.dh td.ttd.genap .isi { padding-left: 50%; }
+    table.dh tr { page-break-inside: avoid; }
+    table.dh thead { display: table-header-group; }
+    .kecil { font-size: 8.5pt; color: #333; }
+    .pengesahan { margin-top: 14px; display: flex; justify-content: flex-end; page-break-inside: avoid; }
+    .pengesahan div { width: 75mm; line-height: 1.45; }
+    .pengesahan .ruang { height: 20mm; }
+    .jumlah { margin-top: 6px; font-size: 10pt; }
+    .muat { text-align: center; padding: 60px; font-family: system-ui, sans-serif; color: #555; }
+    @media print {
+      body { background: #fff; }
+      .alat, #gizilink-pulang { display: none !important; }
+      .kertas { width: auto; min-height: 0; margin: 0; padding: 0; box-shadow: none; }
+    }
+  </style>
+</head>
+<body data-tanpa-gizilink>
+  <div class="alat">
+    <b>Rekap Daftar Hadir</b>
+    <label>Peserta <select id="kat"><option value="">Semua</option><option>Mahasiswa</option><option>CI</option><option>Umum</option></select></label>
+    <label>Urutan <select id="urut"><option value="waktu">Waktu hadir</option><option value="nama">Nama (A–Z)</option><option value="prodi">Prodi / instansi</option></select></label>
+    <button class="utama" onclick="window.print()">🖨️ Cetak / Simpan PDF</button>
+  </div>
+  <div class="kertas" id="kertas"><div class="muat">Memuat data…</div></div>
+
+  <script src="js/umum.js"></script>
+  <script>
+  (async function () {
+    var H = Hadir, esc = H.esc, CFG = H.CFG, kertas = document.getElementById('kertas');
+    var k = new URLSearchParams(location.search).get('k');
+    function galat(m) { kertas.innerHTML = '<div class="muat">' + esc(m) + '</div>'; }
+    if (!window.GiziSSO || !GiziSSO.getStaf()) return galat('Silakan masuk Gizi-Link sebagai dosen/staf terlebih dahulu.');
+    var d;
+    try { d = await H.api('peserta', { k: k, denganTtd: true }); } catch (e) { return galat(e.message); }
+    if (!d.ok) return galat(d.pesan);
+    var keg = d.kegiatan, p = d.pengaturan || {}, I = CFG.INSTITUSI || {};
+    document.title = 'Daftar Hadir - ' + keg.nama;
+
+    function nipFormat(n) { return n ? 'NIP. ' + n : ''; }
+
+    function gambar() {
+      var kat = document.getElementById('kat').value, urut = document.getElementById('urut').value;
+      var list = d.peserta.filter(function (x) { return !kat || x.kategori === kat; });
+      list.sort(function (a, b) {
+        if (urut === 'nama') return a.nama.localeCompare(b.nama, 'id');
+        if (urut === 'prodi') return ((a.prodi + a.instansi).localeCompare(b.prodi + b.instansi, 'id')) || a.nama.localeCompare(b.nama, 'id');
+        return a.waktu < b.waktu ? -1 : 1;
+      });
+      var baris = list.map(function (x, i) {
+        var no = i + 1, sisi = no % 2 ? 'ganjil' : 'genap';
+        var ket = x.kategori === 'Mahasiswa' ? esc(x.prodi) + (x.kelas ? '<br><span class="kecil">' + esc(x.kelas) + '</span>' : '') :
+          esc(x.instansi) + '<br><span class="kecil">' + (x.kategori === 'CI' ? 'CI' : 'Umum') + '</span>';
+        return '<tr><td class="no">' + no + '</td><td>' + esc(x.nama) + '</td><td>' + esc(x.nim || x.nipNik || '-') + '</td><td>' + ket + '</td>' +
+          '<td class="ttd ' + sisi + '"><div class="isi"><span class="n">' + no + '.</span>' + (x.ttd ? '<img src="' + x.ttd + '" alt="">' : '') + '</div></td></tr>';
+      }).join('');
+      kertas.innerHTML =
+        '<div class="kop"><img src="logo.png" alt="">' +
+        '<div class="teks"><div class="k1">' + esc(I.kementerian || '') + '</div>' +
+        '<div class="k1">' + esc(I.direktorat || '') + '</div>' +
+        '<div class="k2">' + esc(I.nama || '') + '</div>' +
+        '<div class="k3">' + esc(p.unit || 'Jurusan Gizi') + '</div>' +
+        '<div class="k4">' + esc((I.alamat || []).join(', ')) + (I.telepon ? ' · Telp. ' + esc(I.telepon) : '') + (I.website ? ' · ' + esc(I.website.replace(/^https?:\/\//, '')) : '') + '</div></div></div>' +
+        '<h1>DAFTAR HADIR</h1><p class="subjudul">' + esc(keg.nama) + '</p>' +
+        '<table class="info">' +
+        (keg.jenis ? '<tr><td>Jenis Kegiatan</td><td>:</td><td>' + esc(keg.jenis) + '</td></tr>' : '') +
+        '<tr><td>Hari/Tanggal</td><td>:</td><td>' + esc(H.tglPanjang(keg.tanggal, true)) + '</td></tr>' +
+        (keg.waktu ? '<tr><td>Waktu</td><td>:</td><td>' + esc(keg.waktu) + '</td></tr>' : '') +
+        (keg.tempat ? '<tr><td>Tempat</td><td>:</td><td>' + esc(keg.tempat) + '</td></tr>' : '') +
+        (keg.narasumber ? '<tr><td>Narasumber</td><td>:</td><td>' + esc(keg.narasumber) + '</td></tr>' : '') +
+        (keg.penyelenggara ? '<tr><td>Penyelenggara</td><td>:</td><td>' + esc(keg.penyelenggara) + '</td></tr>' : '') +
+        '</table>' +
+        '<table class="dh"><thead><tr><th>No</th><th>Nama</th><th>NIM / NIP / NIK</th><th>Prodi / Instansi</th><th>Tanda Tangan</th></tr></thead><tbody>' +
+        (baris || '<tr><td colspan="5" style="text-align:center;padding:20px">Belum ada peserta.</td></tr>') + '</tbody></table>' +
+        '<div class="jumlah">Jumlah peserta hadir: <b>' + list.length + '</b> orang</div>' +
+        '<div class="pengesahan"><div>' + esc(p.kota || 'Makassar') + ', ' + esc(H.tglPanjang(keg.tanggal)) + '<br>' +
+        'Mengetahui,<br>' + esc(p.pengesahan_jabatan || 'Ketua Jurusan Gizi') + ',<div class="ruang"></div>' +
+        '<b><u>' + esc(p.pengesahan_nama || '') + '</u></b><br>' + esc(nipFormat(p.pengesahan_nip)) + '</div></div>';
+    }
+    document.getElementById('kat').onchange = gambar;
+    document.getElementById('urut').onchange = gambar;
+    gambar();
+  })();
+  </script>
+</body>
+</html>

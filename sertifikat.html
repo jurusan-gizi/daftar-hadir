@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="id">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Unduh Sertifikat · Jurusan Gizi Poltekkes Kemenkes Makassar</title>
+  <meta name="theme-color" content="#00B8AD">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="icons/icon-192.png">
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap">
+  <link rel="stylesheet" href="css/style.css">
+  <script src="js/config.js"></script>
+  <script src="https://jurusan-gizi.github.io/sso.js"></script>
+</head>
+<body>
+  <header class="kop">
+    <div class="kop-isi">
+      <img src="logo.png" alt="Kemenkes Poltekkes Makassar" class="logo">
+      <div class="judul"><b>Sertifikat Kegiatan</b><span>Jurusan Gizi</span></div>
+    </div>
+  </header>
+
+  <main class="sempit" id="isi">
+    <div class="muat"><span class="putar"></span> Menyiapkan sertifikat…</div>
+  </main>
+
+  <footer><p>Jurusan Gizi · Poltekkes Kemenkes Makassar</p></footer>
+
+  <script src="vendor/pdf-lib.min.js"></script>
+  <script src="vendor/pdf.min.js"></script>
+  <script src="js/umum.js"></script>
+  <script>
+  (async function () {
+    var H = Hadir, $ = H.$, esc = H.esc, isi = $('isi');
+    var q = new URLSearchParams(location.search);
+    var k = q.get('k'), p = q.get('p'), c = q.get('c');
+    function galat(m) { isi.innerHTML = '<div class="kartu kosong"><span class="em">📄</span><p>' + esc(m) + '</p></div>'; }
+    if (!k || !p || !c) return galat('Link sertifikat tidak lengkap.');
+    try {
+      var d = await H.api('templat', { k: k, p: p, c: c }, { tanpaToken: true });
+      if (!d.ok) return galat(d.pesan);
+      var bytes = await H.buatSertifikat(H.base64KeBytes(d.pdf), d.halaman, d.posisi, d.nama);
+      var file = 'Sertifikat - ' + H.namaFile(d.nama) + ' - ' + H.namaFile(d.kegiatan) + '.pdf';
+      isi.innerHTML =
+        '<div class="kartu pusat"><h2>' + esc(H.namaSertifikat(d.nama)) + '</h2>' +
+        '<p class="sub">' + esc(d.kegiatan) + (d.tanggal ? ' · ' + esc(H.tglPanjang(d.tanggal)) : '') + '</p>' +
+        '<div class="pratinjau" style="margin-bottom:14px"><canvas id="kanvas"></canvas></div>' +
+        '<button class="tbl penuh" id="unduh">⬇️ Unduh Sertifikat (PDF)</button>' +
+        '<p class="kecil mt">Simpan file ini. Link di email dapat dibuka kembali kapan saja.</p></div>';
+      $('unduh').onclick = function () { H.unduhBytes(bytes, file); };
+      try {
+        pdfjsLib.GlobalWorkerOptions.workerSrc = 'vendor/pdf.worker.min.js';
+        var doc = await pdfjsLib.getDocument({ data: bytes.slice() }).promise;
+        var pg = await doc.getPage(1);
+        var cv = $('kanvas'), lebar = Math.min(1400, cv.parentElement.clientWidth * (window.devicePixelRatio || 1) * 1.2);
+        var vp = pg.getViewport({ scale: lebar / pg.getViewport({ scale: 1 }).width });
+        cv.width = vp.width; cv.height = vp.height;
+        await pg.render({ canvasContext: cv.getContext('2d'), viewport: vp }).promise;
+      } catch (e) { $('kanvas').parentElement.hidden = true; }
+    } catch (e) { galat(e.message); }
+  })();
+  </script>
+</body>
+</html>
