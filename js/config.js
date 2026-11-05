@@ -1,7 +1,7 @@
 // Satu-satunya file yang perlu diubah setelah Apps Script di-deploy.
 window.HADIR_CONFIG = {
   // Tempel URL Web App Apps Script "Daftar Hadir Kegiatan" (berakhiran /exec)
-  API_URL: 'TEMPEL_URL_APPS_SCRIPT_DI_SINI',
+  API_URL: 'https://script.google.com/macros/s/AKfycbxOaESmFiru7UnDxeJl_v9cYFao7viq9AJVKBvIeB9z5pn6xcjskDEQLyQh38Q0Qd3ffg/exec',
   // Alamat aplikasi ini (untuk link daftar hadir & QR code)
   URL_APLIKASI: 'https://jurusan-gizi.github.io/daftar-hadir/',
   // Data institusi untuk kop rekap daftar hadir
