@@ -1,5 +1,5 @@
 /* Service worker: tampilan aplikasi tetap terbuka saat sinyal lemah. Data selalu diambil dari server. */
-var CACHE = 'daftar-hadir-v4';
+var CACHE = 'daftar-hadir-v5';
 var SHELL = [
   './', 'index.html', 'hadir.html', 'sertifikat.html', 'rekap.html', 'materi.html', 'laporan.html', 'logo.png', 'kop.png', 'manifest.webmanifest',
   'css/style.css', 'js/config.js', 'js/umum.js', 'js/ttd.js', 'js/hadir.js', 'js/app.js', 'js/cover.js', 'js/laporan.js',

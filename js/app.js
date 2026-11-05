@@ -224,7 +224,7 @@
   /* ---------- Detail kegiatan ---------- */
   function detail(k, tab) {
     var tabs = [['bagikan', '🔗 Bagikan'], ['peserta', '👥 Peserta'], ['notulensi', '📝 Notulensi'], ['dokumentasi', '📷 Dokumentasi'], ['materi', '📚 Materi'],
-      ['surat', '✉️ Surat'], ['evaluasi', '⭐ Evaluasi'], ['sertifikat', '📄 Sertifikat'], ['rekap', '📑 Rekap & Laporan']];
+      ['surat', '✉️ Surat'], ['evaluasi', '⭐ Evaluasi'], ['sertifikat', '📄 Sertifikat'], ['rekap', '📑 Laporan']];
     isi.innerHTML =
       '<div class="baris antara" style="margin-bottom:12px"><a class="tbl garis kecil" href="#/">← Semua kegiatan</a>' +
       '<div class="baris"><a class="tbl garis kecil" href="#/edit/' + esc(k.id) + '">✏️ Ubah</a>' +
@@ -249,6 +249,7 @@
       '<div id="isi-tab"></div>';
 
     $('tab').onclick = function (e) { var b = e.target.closest('button'); if (b) location.hash = '#/k/' + k.id + '/' + b.dataset.t; };
+    var aktifTab = document.querySelector('#tab button.aktif'); if (aktifTab && aktifTab.scrollIntoView) aktifTab.scrollIntoView({ block: 'nearest', inline: 'center' });
     $('status-absen').onchange = async function (e) {
       try {
         var r = await H.api('aturAbsen', { k: k.id, status: e.target.value });
