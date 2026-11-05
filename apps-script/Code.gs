@@ -58,7 +58,7 @@ var SHEETS = {
   // Notulensi & isian laporan (JSON per kegiatan)
   Laporan: ['kegiatanId', 'data', 'diubahOleh', 'diubahPada'],
   // Foto dokumentasi & materi narasumber (file di Google Drive)
-  Berkas: ['id', 'kegiatanId', 'jenis', 'nama', 'fileId', 'mime', 'ukuran', 'narasumber', 'urutan', 'diunggahOleh', 'waktu'],
+  Berkas: ['id', 'kegiatanId', 'jenis', 'nama', 'fileId', 'mime', 'ukuran', 'narasumber', 'urutan', 'diunggahOleh', 'waktu', 'keterangan'],
   Pengaturan: ['kunci', 'nilai', 'keterangan'],
   Log: ['waktu', 'oleh', 'aksi', 'detail']
 };
@@ -1017,13 +1017,13 @@ function folderBerkas_(k) {
 function berkas_(kid, jenis) {
   return rows_('Berkas').filter(function (b) { return b.kegiatanId === kid && (!jenis || b.jenis === jenis); })
     .sort(function (a, b) { return (Number(a.urutan) || 0) - (Number(b.urutan) || 0) || (a.waktu < b.waktu ? -1 : 1); })
-    .map(function (b) { return { id: b.id, jenis: b.jenis, nama: b.nama, mime: b.mime, ukuran: Number(b.ukuran) || 0, narasumber: b.narasumber, urutan: Number(b.urutan) || 0, waktu: b.waktu }; });
+    .map(function (b) { return { id: b.id, jenis: b.jenis, nama: b.nama, mime: b.mime, ukuran: Number(b.ukuran) || 0, narasumber: b.narasumber, urutan: Number(b.urutan) || 0, waktu: b.waktu, keterangan: b.keterangan || '' }; });
 }
 
 function unggahBerkas_(u, req) {
   var k = kegiatan_(req.k);
   if (!k) return { ok: false, pesan: 'Kegiatan tidak ditemukan.' };
-  var jenis = req.jenis === 'materi' ? 'materi' : 'foto';
+  var jenis = ['materi', 'surat'].indexOf(req.jenis) >= 0 ? req.jenis : 'foto';
   var bytes = Utilities.base64Decode(String(req.data || ''));
   if (!bytes.length) return { ok: false, pesan: 'File kosong.' };
   if (bytes.length > MAKS_BERKAS) return { ok: false, pesan: 'File terlalu besar (maks. 20 MB).' };
@@ -1033,7 +1033,8 @@ function unggahBerkas_(u, req) {
   return kunci_(function () {
     var urutan = berkas_(k.id, jenis).length + 1;
     var row = { id: 'B' + acak_(8), kegiatanId: k.id, jenis: jenis, nama: nama, fileId: file.getId(), mime: mime, ukuran: bytes.length,
-      narasumber: bersih_(req.narasumber, 200), urutan: urutan, diunggahOleh: u.nama, waktu: sekarang_('yyyy-MM-dd HH:mm:ss') };
+      narasumber: bersih_(req.narasumber, 200), urutan: urutan, diunggahOleh: u.nama, waktu: sekarang_('yyyy-MM-dd HH:mm:ss'),
+      keterangan: bersih_(req.keterangan, 200) };
     tambah_('Berkas', row);
     log_(u.nama, 'unggah ' + jenis, k.id + ' ' + nama);
     return { ok: true, berkas: berkas_(k.id) };

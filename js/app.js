@@ -224,7 +224,7 @@
   /* ---------- Detail kegiatan ---------- */
   function detail(k, tab) {
     var tabs = [['bagikan', '🔗 Bagikan'], ['peserta', '👥 Peserta'], ['notulensi', '📝 Notulensi'], ['dokumentasi', '📷 Dokumentasi'], ['materi', '📚 Materi'],
-      ['evaluasi', '⭐ Evaluasi'], ['sertifikat', '📄 Sertifikat'], ['rekap', '📑 Rekap & Laporan']];
+      ['surat', '✉️ Surat'], ['evaluasi', '⭐ Evaluasi'], ['sertifikat', '📄 Sertifikat'], ['rekap', '📑 Rekap & Laporan']];
     isi.innerHTML =
       '<div class="baris antara" style="margin-bottom:12px"><a class="tbl garis kecil" href="#/">← Semua kegiatan</a>' +
       '<div class="baris"><a class="tbl garis kecil" href="#/edit/' + esc(k.id) + '">✏️ Ubah</a>' +
@@ -270,7 +270,7 @@
       await segarkan(); H.toast('Kegiatan dihapus.'); location.hash = '#/';
     };
 
-    ({ bagikan: tabBagikan, peserta: tabPeserta, notulensi: tabNotulensi, dokumentasi: tabDokumentasi, materi: tabMateri, evaluasi: tabEvaluasi,
+    ({ bagikan: tabBagikan, peserta: tabPeserta, notulensi: tabNotulensi, dokumentasi: tabDokumentasi, materi: tabMateri, surat: tabSurat, evaluasi: tabEvaluasi,
       sertifikat: tabSertifikat, rekap: tabRekap }[tab] || tabBagikan)(k);
   }
 
@@ -1117,6 +1117,71 @@
         d.berkas = r.berkas; H.toast('Materi terunggah.'); gambar();
       } catch (e) { H.toast(e.message, true); }
       finally { if ($('m-unggah')) { $('m-unggah').disabled = false; $('m-status').textContent = ''; } }
+    }
+    gambar();
+  }
+
+  /* =================== SURAT KEGIATAN =================== */
+  var JENIS_SURAT = ['Undangan Narasumber', 'Undangan Peserta / CI', 'Surat Tugas / SK Panitia', 'Surat Permohonan', 'Lainnya'];
+  async function tabSurat(k) {
+    var wadah = $('isi-tab');
+    wadah.innerHTML = '<div class="muat"><span class="putar"></span> Memuat surat…</div>';
+    var d;
+    try { d = LAP[k.id] || await muatLaporan(k); } catch (e) { wadah.innerHTML = '<div class="pesan galat">' + esc(e.message) + '</div>'; return; }
+    function gambar() {
+      var surat = d.berkas.filter(function (b) { return b.jenis === 'surat'; });
+      wadah.innerHTML =
+        '<div class="kartu"><h3>⬆️ Unggah surat kegiatan</h3><p class="sub kecil">PDF hasil SRIKANDI atau foto/scan (JPG/PNG), maks. 20 MB. Surat masuk ke <b>Lampiran</b> laporan (tiap halaman ditampilkan utuh) dan nomornya otomatis ditulis di <b>Dasar Kegiatan</b>.</p>' +
+        '<div class="grid2"><label class="f"><span>Jenis surat</span><select id="s-jenis">' + JENIS_SURAT.map(function (j) { return '<option>' + esc(j) + '</option>'; }).join('') + '</select></label>' +
+        '<label class="f"><span>Nomor surat <em class="kecil" style="font-style:normal">(opsional)</em></span><input type="text" id="s-nomor" placeholder="mis. PP.05.01/F.XII.11.8/1342/2026"></label></div>' +
+        '<label class="f"><span>File surat</span><input type="file" id="s-file" accept=".pdf,image/jpeg,image/png,application/pdf"></label>' +
+        '<button class="tbl" id="s-unggah">⬆️ Unggah</button> <span class="kecil" id="s-status"></span></div>' +
+        '<div class="kartu"><h3>✉️ Surat kegiatan (' + surat.length + ')</h3>' +
+        (surat.length ? '<div class="daftar-materi">' + surat.map(function (m, i) {
+          return '<div class="materi-item"><span class="ikon">' + (/pdf/.test(m.mime) ? '📕' : '🖼️') + '</span><div class="info"><b>' + esc(m.narasumber || 'Surat') + '</b>' +
+            '<span class="kecil">' + (m.keterangan ? 'Nomor ' + esc(m.keterangan) + ' · ' : '') + esc(m.nama) + ' · ' + esc(H.ukuranFile(m.ukuran)) + '</span></div>' +
+            (i > 0 ? '<button class="tbl garis ikon kecil" data-naik="' + m.id + '" title="Naikkan">↑</button>' : '') +
+            '<button class="tbl lembut kecil" data-unduh="' + m.id + '">⬇️</button><button class="tbl bahaya kecil" data-hapus="' + m.id + '">✕</button></div>';
+        }).join('') + '</div>' : '<div class="kosong kecil">Belum ada surat. Unggah undangan narasumber, undangan peserta/CI, atau surat tugas agar laporan lengkap.</div>') + '</div>';
+      $('s-unggah').onclick = unggah;
+      wadah.querySelectorAll('[data-unduh]').forEach(function (b) {
+        b.onclick = async function () {
+          b.disabled = true;
+          try { var r = await H.api('ambilBerkas', { id: b.dataset.unduh }); if (!r.ok) return H.toast(r.pesan, true); H.unduhBytes(H.base64KeBytes(r.data), r.nama, r.mime); }
+          catch (e) { H.toast(e.message, true); } finally { b.disabled = false; }
+        };
+      });
+      wadah.querySelectorAll('[data-hapus]').forEach(function (b) {
+        b.onclick = async function () {
+          if (!await H.konfirmasi('Hapus surat?', 'Surat ini akan dihapus dari lampiran laporan.', 'Hapus', true)) return;
+          var r = await H.api('hapusBerkas', { id: b.dataset.hapus }); if (!r.ok) return H.toast(r.pesan, true);
+          d.berkas = r.berkas; gambar();
+        };
+      });
+      wadah.querySelectorAll('[data-naik]').forEach(function (b) {
+        b.onclick = async function () {
+          var ids = surat.map(function (x) { return x.id; }), i = ids.indexOf(b.dataset.naik);
+          ids.splice(i - 1, 0, ids.splice(i, 1)[0]);
+          var r = await H.api('urutBerkas', { k: k.id, ids: ids }); if (!r.ok) return H.toast(r.pesan, true);
+          d.berkas = r.berkas; gambar();
+        };
+      });
+    }
+    async function unggah() {
+      var f = $('s-file').files[0];
+      if (!f) return H.toast('Pilih file surat dulu.', true);
+      if (!/\.(pdf|jpe?g|png)$/i.test(f.name)) return H.toast('Format harus PDF, JPG, atau PNG.', true);
+      if (f.size > 20 * 1024 * 1024) return H.toast('File terlalu besar (maks. 20 MB).', true);
+      var b = $('s-unggah'); b.disabled = true; $('s-status').textContent = 'Mengunggah…';
+      try {
+        var data, mime = f.type || 'application/pdf', nama = f.name;
+        if (/^image\//.test(mime)) { var g = await H.kecilkanGambar(f, 2200, 0.88); data = g.dataUrl.split(',')[1]; mime = 'image/jpeg'; nama = nama.replace(/\.[^.]+$/, '') + '.jpg'; }
+        else data = await H.fileKeBase64(f);
+        var r = await H.api('unggahBerkas', { k: k.id, jenis: 'surat', nama: nama, mime: mime, data: data, narasumber: $('s-jenis').value, keterangan: $('s-nomor').value.trim() });
+        if (!r.ok) { H.toast(r.pesan, true); return; }
+        d.berkas = r.berkas; H.toast('Surat terunggah.'); gambar();
+      } catch (e) { H.toast(e.message, true); }
+      finally { if ($('s-unggah')) { $('s-unggah').disabled = false; $('s-status').textContent = ''; } }
     }
     gambar();
   }

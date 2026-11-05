@@ -198,6 +198,22 @@
     return { data: c.toDataURL('image/jpeg', 0.88), w: c.width, h: c.height };
   }
 
+  /** Halaman PDF → gambar JPEG (±150 dpi). */
+  async function halamanPdf(bytes, maks) {
+    if (!w.pdfjsLib) return [];
+    w.pdfjsLib.GlobalWorkerOptions.workerSrc = 'vendor/pdf.worker.min.js';
+    var doc = await w.pdfjsLib.getDocument({ data: bytes }).promise, out = [];
+    for (var i = 1; i <= Math.min(doc.numPages, maks || 15); i++) {
+      var pg = await doc.getPage(i), v1 = pg.getViewport({ scale: 1 });
+      var vp = pg.getViewport({ scale: Math.min(1240 / v1.width, 1754 / v1.height) });
+      var c = document.createElement('canvas'); c.width = Math.round(vp.width); c.height = Math.round(vp.height);
+      var x = c.getContext('2d'); x.fillStyle = '#fff'; x.fillRect(0, 0, c.width, c.height);
+      await pg.render({ canvasContext: x, viewport: vp }).promise;
+      out.push({ data: c.toDataURL('image/jpeg', 0.85), w: c.width, h: c.height });
+    }
+    return out;
+  }
+
   /* =================== BAHAN =================== */
   /** Kumpulkan semua bahan laporan dari server. kemajuan(teks) opsional. */
   async function siapkan(kid, kemajuan) {
@@ -211,6 +227,18 @@
       kemajuan('Mengambil foto ' + (i + 1) + '/' + fotoList.length + '…');
       var f = await H.api('ambilBerkas', { id: fotoList[i].id });
       if (f.ok) foto.push(await infoGambar('data:' + f.mime + ';base64,' + f.data));
+    }
+    var suratList = (d.berkas || []).filter(function (b) { return b.jenis === 'surat'; }), surat = [];
+    for (var si = 0; si < suratList.length; si++) {
+      kemajuan('Mengambil surat ' + (si + 1) + '/' + suratList.length + '…');
+      var sr = await H.api('ambilBerkas', { id: suratList[si].id });
+      if (!sr.ok) continue;
+      var hal = [];
+      try {
+        if (/pdf/.test(sr.mime)) hal = await halamanPdf(H.base64KeBytes(sr.data), 15);
+        else hal = [await infoGambar('data:' + sr.mime + ';base64,' + sr.data)];
+      } catch (e) { hal = []; }
+      surat.push({ jenis: suratList[si].narasumber || 'Surat', nomor: suratList[si].keterangan || '', halaman: hal });
     }
     kemajuan('Menyiapkan gambar…');
     var kop = await infoGambar(await urlKeDataUrl('kop.png'));
@@ -231,7 +259,7 @@
       var tt = d.peserta[j].ttd;
       if (tt) { try { ttdPeserta[d.peserta[j].id] = await infoGambar(tt); } catch (e) { } }
     }
-    return { d: d, foto: foto, kop: kop, logo: logo, sampul: sampul, pengesah: pengesah, ring: ring, grafik: grafik, grafikN: grafikN, serti: serti, ttdPeserta: ttdPeserta };
+    return { d: d, surat: surat, foto: foto, kop: kop, logo: logo, sampul: sampul, pengesah: pengesah, ring: ring, grafik: grafik, grafikN: grafikN, serti: serti, ttdPeserta: ttdPeserta };
   }
 
   /* =================== MODEL =================== */
@@ -278,7 +306,13 @@
     blok.push({ t: 'sub', text: 'A. Latar Belakang' });
     baris(L.latarBelakang || baku.latarBelakang).forEach(function (t) { blok.push({ t: 'p', text: t }); });
     blok.push({ t: 'sub', text: 'B. Dasar Kegiatan' });
-    blok.push({ t: 'ol', items: H.rapikanPoin(L.dasar || baku.dasar) });
+    var dasar = H.rapikanPoin(L.dasar || baku.dasar);
+    (B.surat || []).forEach(function (s) {
+      if (!s.nomor) return;
+      var sudah = dasar.some(function (x) { return x.indexOf(s.nomor) >= 0; });
+      if (!sudah) dasar.push(s.jenis + ' Nomor ' + s.nomor + '.');
+    });
+    blok.push({ t: 'ol', items: dasar });
     blok.push({ t: 'sub', text: 'C. Tujuan' });
     blok.push({ t: 'ol', items: H.rapikanPoin(L.tujuan || baku.tujuan) });
 
@@ -377,6 +411,18 @@
 
     // ---- Lampiran ----
     var noLamp = 1;
+    var adaSurat = (B.surat || []).filter(function (s) { return s.halaman.length; });
+    if (adaSurat.length) {
+      var noSurat = noLamp++;
+      adaSurat.forEach(function (s, si) {
+        s.halaman.forEach(function (g, gi) {
+          blok.push({ t: 'halaman' });
+          if (si === 0 && gi === 0) blok.push({ t: 'judul', text: 'LAMPIRAN ' + noSurat + '. SURAT KEGIATAN' });
+          if (gi === 0) blok.push({ t: 'judulKecil', text: HURUF[si].toLowerCase() + '. ' + s.jenis + (s.nomor ? ' Nomor ' + s.nomor : '') });
+          blok.push({ t: 'img', img: g, wmm: 150, hmm: si === 0 && gi === 0 ? 200 : 215, bingkai: true });
+        });
+      });
+    }
     blok.push({ t: 'halaman' });
     blok.push({ t: 'kop', img: B.kop });
     blok.push({ t: 'judul', text: 'LAMPIRAN ' + (noLamp++) + '. DAFTAR HADIR' });
@@ -530,7 +576,7 @@
           break;
         }
         case 'img': {
-          var u = ukurPas(b.img, Math.min(b.wmm || CWmm, CWmm), 200);
+          var u = ukurPas(b.img, Math.min(b.wmm || CWmm, CWmm), b.hmm || 200);
           isi.push(para([gambar(b.img, u[0], u[1])], { alignment: C, spacing: { before: 80, after: b.caption ? 20 : 120, line: 240 } }));
           if (b.caption) isi.push(para([run(b.caption, { italics: true, size: 20 })], { alignment: C, spacing: { after: 160, line: 260 } }));
           break;
@@ -641,7 +687,7 @@
               return '<tr' + (b.tebalAkhir && ri === b.rows.length - 1 ? ' class="akhir"' : '') + '>' + r.map(function (v, i) { return '<td' + ((b.tengah || [0]).indexOf(i) >= 0 ? ' class="c"' : '') + '>' + e(v) + '</td>'; }).join('') + '</tr>';
             }).join('') + '</tbody></table>');
           break;
-        case 'img': out.push('<figure><img src="' + b.img.data + '" style="max-width:' + (b.wmm || 150) + 'mm" alt="">' + (b.caption ? '<figcaption>' + e(b.caption) + '</figcaption>' : '') + '</figure>'); break;
+        case 'img': out.push('<figure><img src="' + b.img.data + '" style="max-width:' + (b.wmm || 150) + 'mm;max-height:' + (b.hmm || 200) + 'mm;width:auto' + (b.bingkai ? ';border:1px solid #CBD5E1' : '') + '" alt="">' + (b.caption ? '<figcaption>' + e(b.caption) + '</figcaption>' : '') + '</figure>'); break;
         case 'qa':
           out.push('<div class="qa"><p class="q"><b>' + b.no + '. Pertanyaan dari <span class="teal">' + e(b.penanya) + '</span></b></p><p class="tanya">' + e(b.pertanyaan) + '</p>' +
             (b.jawaban.length ? '<p class="jawab-l">Tanggapan' + (b.penjawab ? ' ' + e(b.penjawab) : '') + ':</p><ul>' + b.jawaban.map(function (x) { return '<li>' + e(x) + '</li>'; }).join('') + '</ul>' : '') + '</div>');

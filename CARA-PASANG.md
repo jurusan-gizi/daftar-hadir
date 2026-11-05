@@ -94,6 +94,7 @@ Kolom `badge_api` membuat kartu menu menampilkan jumlah daftar hadir yang sedang
 | Saat | Menu | Yang dilakukan |
 |---|---|---|
 | Sebelum | Ubah kegiatan | Centang 🔐 kode kehadiran & ⭐ evaluasi (otomatis tercentang untuk kegiatan baru). Tulis narasumber bernomor: `1. Nama 2. Nama` |
+| Sebelum | ✉️ Surat | Unggah undangan narasumber, undangan peserta/CI, surat tugas (PDF SRIKANDI/foto) + nomornya — masuk Lampiran 1 & Dasar Kegiatan |
 | Sebelum/selama | 📚 Materi | Unggah PPT/PDF/Word per narasumber (maks. 20 MB) |
 | Selama | 📝 Notulensi | Isi pokok materi (satu poin per baris) & kartu tanya jawab |
 | Akhir acara | Halaman kegiatan | **Tampilkan layar penuh** kode kehadiran, lalu **Tutup sekarang** setelah selesai |
