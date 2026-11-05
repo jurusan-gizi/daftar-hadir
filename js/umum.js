@@ -7,6 +7,7 @@
     D3: 'D3 Gizi',
     D4: 'D4 Gizi dan Dietetika',
     PROF: 'Profesi Dietisien',
+    STAF: 'Dosen/PLP/Tendik',
     CI: 'CI (Clinical Instructor)',
     UMUM: 'Umum'
   };
@@ -79,7 +80,18 @@
   }
 
   /* ---------- Tanggal ---------- */
+  /** Terima juga format tanggal lain (mis. "Sat Nov 14 2026 00:00:00 GMT+0800") → "2026-11-14T00:00" waktu Makassar. */
+  function isoWita(v) {
+    var s = String(v || '');
+    if (!s || /^\d{4}-\d{2}-\d{2}/.test(s)) return s;
+    var d = new Date(s);
+    if (isNaN(d)) return s;
+    var t = new Date(d.getTime() + 8 * 3600e3);   // WITA = UTC+8
+    function d2(n) { return String(n).padStart(2, '0'); }
+    return t.getUTCFullYear() + '-' + d2(t.getUTCMonth() + 1) + '-' + d2(t.getUTCDate()) + 'T' + d2(t.getUTCHours()) + ':' + d2(t.getUTCMinutes());
+  }
   function tglPanjang(iso, denganHari) {
+    iso = isoWita(iso);
     if (!iso) return '';
     var p = String(iso).slice(0, 10).split('-');
     if (p.length < 3) return iso;
@@ -87,11 +99,13 @@
     return (denganHari ? HARI[d.getDay()] + ', ' : '') + Number(p[2]) + ' ' + BULAN[Number(p[1]) - 1] + ' ' + p[0];
   }
   function waktuPanjang(iso) {
+    iso = isoWita(iso);
     if (!iso) return '';
     var j = String(iso).split(/[T ]/)[1];
     return tglPanjang(iso) + (j ? ', ' + j.slice(0, 5).replace(':', '.') + ' WITA' : '');
   }
   function jam(iso) {
+    iso = isoWita(iso);
     var j = String(iso || '').split(/[T ]/)[1];
     return j ? j.slice(0, 5).replace(':', '.') : '';
   }

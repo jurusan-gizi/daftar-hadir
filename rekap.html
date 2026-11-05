@@ -55,7 +55,7 @@
 <body data-tanpa-gizilink>
   <div class="alat">
     <b>Rekap Daftar Hadir</b>
-    <label>Peserta <select id="kat"><option value="">Semua</option><option>Mahasiswa</option><option>CI</option><option>Umum</option></select></label>
+    <label>Peserta <select id="kat"><option value="">Semua</option><option>Mahasiswa</option><option>Dosen/PLP/Tendik</option><option>CI</option><option>Umum</option></select></label>
     <label>Urutan <select id="urut"><option value="waktu">Waktu hadir</option><option value="nama">Nama (A–Z)</option><option value="prodi">Prodi / instansi</option></select></label>
     <button class="utama" onclick="window.print()">🖨️ Cetak / Simpan PDF</button>
   </div>
@@ -87,7 +87,7 @@
       var baris = list.map(function (x, i) {
         var no = i + 1, sisi = no % 2 ? 'ganjil' : 'genap';
         var ket = x.kategori === 'Mahasiswa' ? esc(x.prodi) + (x.kelas ? '<br><span class="kecil">' + esc(x.kelas) + '</span>' : '') :
-          esc(x.instansi) + '<br><span class="kecil">' + (x.kategori === 'CI' ? 'CI' : 'Umum') + '</span>';
+          esc(x.instansi) + '<br><span class="kecil">' + esc(x.kategori) + '</span>';
         return '<tr><td class="no">' + no + '</td><td>' + esc(x.nama) + '</td><td>' + esc(x.nim || x.nipNik || '-') + '</td><td>' + ket + '</td>' +
           '<td class="ttd ' + sisi + '"><div class="isi"><span class="n">' + no + '.</span>' + (x.ttd ? '<img src="' + x.ttd + '" alt="">' : '') + '</div></td></tr>';
       }).join('');

@@ -349,13 +349,14 @@
       } catch (e) { if (!diam) wadah.innerHTML = '<div class="pesan galat">' + esc(e.message) + '</div>'; }
     }
     function gambar(list) {
-      var hitung = { Mahasiswa: 0, CI: 0, Umum: 0 }, prodi = {};
+      var hitung = { Mahasiswa: 0, CI: 0, Umum: 0, 'Dosen/PLP/Tendik': 0 }, prodi = {};
       list.forEach(function (p) { hitung[p.kategori] = (hitung[p.kategori] || 0) + 1; if (p.kategori === 'Mahasiswa') prodi[p.prodi] = (prodi[p.prodi] || 0) + 1; });
       var serti = k.modeSertifikat !== 'tanpa' && k.adaTemplat;
       var tampil = list.filter(function (p) { return !q || (p.nama + ' ' + p.nim + ' ' + p.instansi + ' ' + p.email + ' ' + p.prodi).toLowerCase().indexOf(q) >= 0; });
       wadah.innerHTML =
         '<div class="statistik"><div class="stat"><b>' + list.length + '</b><span>Total hadir</span></div>' +
         Object.keys(prodi).map(function (p) { return '<div class="stat"><b>' + prodi[p] + '</b><span>' + esc(p) + '</span></div>'; }).join('') +
+        (hitung['Dosen/PLP/Tendik'] ? '<div class="stat"><b>' + hitung['Dosen/PLP/Tendik'] + '</b><span>Dosen/PLP/Tendik</span></div>' : '') +
         (hitung.CI ? '<div class="stat"><b>' + hitung.CI + '</b><span>CI</span></div>' : '') +
         (hitung.Umum ? '<div class="stat"><b>' + hitung.Umum + '</b><span>Umum</span></div>' : '') + '</div>' +
         '<div class="saring"><input type="search" id="cari-p" placeholder="Cari nama, NIM, instansi, email…" value="' + esc(q) + '">' +
@@ -395,7 +396,7 @@
     var mhs = p.kategori === 'Mahasiswa';
     var html = '<label class="f"><span>Nama ' + (mhs ? '' : '& gelar') + '</span><input type="text" id="u-nama" value="' + esc(p.nama) + '"></label>' +
       (mhs ? '<label class="f"><span>NIM</span><input type="text" id="u-nim" value="' + esc(p.nim) + '"></label>' :
-        '<label class="f"><span>' + (p.kategori === 'CI' ? 'Lahan praktik' : 'Instansi') + '</span><input type="text" id="u-inst" value="' + esc(p.instansi) + '"></label>' +
+        '<label class="f"><span>' + (p.kategori === 'CI' ? 'Lahan praktik' : p.kategori === 'Umum' ? 'Instansi' : 'Jabatan / unit kerja') + '</span><input type="text" id="u-inst" value="' + esc(p.instansi) + '"></label>' +
         '<label class="f"><span>NIP / NIK</span><input type="text" id="u-nip" value="' + esc(p.nipNik) + '"></label>') +
       '<label class="f"><span>Email</span><input type="email" id="u-email" value="' + esc(p.email) + '"></label>' +
       (k.modeSertifikat !== 'tanpa' ? '<p class="kecil">Di sertifikat: <b id="u-prev">' + esc(H.namaSertifikat(p.nama)) + '</b></p>' : '');

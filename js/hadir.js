@@ -4,7 +4,7 @@
   var H = window.Hadir, $ = H.$, esc = H.esc;
   var kId = new URLSearchParams(location.search).get('k') || '';
   var KEG = null, pad = null;
-  var st = { kategori: '', mhs: null, nimDicek: '', pakaiSso: false, emailSamar: '' };
+  var st = { kategori: '', mhs: null, nimDicek: '', pakaiSso: false, emailSamar: '', staf: null, nipDicek: '' };
 
   var isi = $('isi');
 
@@ -51,11 +51,13 @@
     }
 
     var sso = window.GiziSSO && GiziSSO.get();
+    var ssoStaf = window.GiziSSO && GiziSSO.getStaf();
     var kodeSso = sso ? kodeProdi(sso.prodi) : '';
-    st.pakaiSso = !!(sso && k.sasaran.indexOf(kodeSso) >= 0);
+    st.pakaiSso = !!(sso && k.sasaran.indexOf(kodeSso) >= 0) || !!(ssoStaf && k.sasaran.indexOf('STAF') >= 0);
 
     var opsiKat = [];
     if (sasaranMhs().length) opsiKat.push(['MHS', '🎓', 'Mahasiswa', 'Jurusan Gizi']);
+    if (k.sasaran.indexOf('STAF') >= 0) opsiKat.push(['STAF', '🧑‍🏫', 'Dosen/PLP/Tendik', 'Pegawai Jurusan Gizi']);
     if (k.sasaran.indexOf('CI') >= 0) opsiKat.push(['CI', '🏥', 'CI', 'Clinical Instructor']);
     if (k.sasaran.indexOf('UMUM') >= 0) opsiKat.push(['UMUM', '👥', 'Peserta Umum', 'Instansi / masyarakat']);
 
@@ -87,7 +89,8 @@
     $('form').addEventListener('submit', kirim);
     $('ttd-ulang').onclick = function () { pad && pad.hapus(); };
 
-    if (st.pakaiSso) tampilSso(sso);
+    if (st.pakaiSso && ssoStaf) tampilSsoStaf(ssoStaf);
+    else if (st.pakaiSso) tampilSso(sso);
     else if (opsiKat.length === 1) pilihKategori(opsiKat[0][0]);
   }
 
@@ -114,6 +117,22 @@
     tampilAkhir();
   }
 
+  function tampilSsoStaf(s) {
+    st.kategori = 'STAF';
+    $('blok-sso').innerHTML =
+      '<div class="cek-nama"><span>Masuk lewat Gizi-Link sebagai</span><b>' + esc(s.nama) + '</b>' +
+      '<span>' + esc(s.id) + ' · Dosen/PLP/Tendik</span></div>' +
+      '<p class="kecil" style="margin:-4px 0 12px">Bukan Anda? <a href="#" id="bukan-saya">Isi sebagai peserta lain</a></p>';
+    $('bukan-saya').onclick = function (e) {
+      e.preventDefault(); st.pakaiSso = false; $('blok-sso').innerHTML = ''; $('blok-kategori').hidden = false;
+      $('blok-isian').innerHTML = ''; $('blok-akhir').hidden = true; st.kategori = '';
+    };
+    var serti = KEG.modeSertifikat !== 'tanpa';
+    $('blok-isian').innerHTML = isianEmail(false, serti ? 'Untuk menerima link sertifikat. Email tersimpan dipakai bila dikosongkan.' : '');
+    st.staf = { nama: s.nama };
+    tampilAkhir();
+  }
+
   function isianEmail(wajib, bantu) {
     return '<label class="f"><span>Email' + (wajib ? ' <i>*</i>' : ' <em class="kecil" style="font-style:normal">(opsional)</em>') + '</span>' +
       '<input type="email" id="email" inputmode="email" autocomplete="email" placeholder="nama@contoh.com">' +
@@ -121,7 +140,7 @@
   }
 
   function pilihKategori(kat) {
-    st.kategori = kat; st.mhs = null; st.nimDicek = '';
+    st.kategori = kat; st.mhs = null; st.nimDicek = ''; st.staf = null; st.nipDicek = '';
     document.querySelectorAll('#kategori button').forEach(function (b) { b.classList.toggle('aktif', b.dataset.k === kat); });
     var serti = KEG.modeSertifikat !== 'tanpa';
     var bantuEmail = serti ? 'Link sertifikat dikirim ke email ini.' : '';
@@ -132,6 +151,12 @@
         '<button type="button" class="tbl lembut" id="cek">Cek</button></div>' +
         '<small>Ketik NIM, nama & prodi akan muncul otomatis.</small></label>' +
         '<div id="hasil-nim"></div>';
+    } else if (kat === 'STAF') {
+      h = '<label class="f"><span>NIP <i>*</i></span>' +
+        '<div class="link-kotak"><input type="text" id="nip" inputmode="numeric" autocomplete="off" placeholder="Contoh: 19771009 200604 1 010">' +
+        '<button type="button" class="tbl lembut" id="cek-nip">Cek</button></div>' +
+        '<small>Ketik NIP, nama akan muncul otomatis dari data pegawai Jurusan Gizi.</small></label>' +
+        '<div id="hasil-nip"></div>';
     } else if (kat === 'CI') {
       h = '<label class="f"><span>Nama lengkap & gelar <i>*</i></span><input type="text" id="nama" autocomplete="name" placeholder="Contoh: Hasnah, S.Gz, RD"></label>' +
         '<label class="f"><span>Lahan praktik <i>*</i></span><input type="text" id="instansi" placeholder="Contoh: RSUP Dr. Wahidin Sudirohusodo"></label>' +
@@ -143,7 +168,13 @@
         isianEmail(serti, bantuEmail);
     }
     $('blok-isian').innerHTML = h;
-    if (kat === 'MHS') {
+    if (kat === 'STAF') {
+      $('blok-akhir').hidden = true;
+      $('cek-nip').onclick = cekNip;
+      $('nip').addEventListener('keydown', function (e) { if (e.key === 'Enter') { e.preventDefault(); cekNip(); } });
+      $('nip').addEventListener('input', function () { if (st.nipDicek) { st.nipDicek = ''; st.staf = null; $('hasil-nip').innerHTML = ''; $('blok-akhir').hidden = true; } });
+      $('nip').focus();
+    } else if (kat === 'MHS') {
       $('blok-akhir').hidden = true;
       $('cek').onclick = cekNim;
       $('nim').addEventListener('keydown', function (e) { if (e.key === 'Enter') { e.preventDefault(); cekNim(); } });
@@ -192,7 +223,34 @@
     finally { btn.disabled = false; btn.textContent = 'Cek'; }
   }
 
+  async function cekNip() {
+    var nip = $('nip').value.trim();
+    if (nip.replace(/\D/g, '').length < 8) { H.toast('Ketik NIP dengan lengkap.', true); return; }
+    var btn = $('cek-nip'); btn.disabled = true; btn.innerHTML = '<span class="putar kcl"></span>';
+    try {
+      var d = await H.api('cekNip', { nip: nip }, { tanpaToken: true });
+      if (!d.ok) { H.toast(d.pesan, true); return; }
+      st.nipDicek = nip;
+      var serti = KEG.modeSertifikat !== 'tanpa';
+      if (d.ditemukan) {
+        st.staf = d;
+        $('hasil-nip').innerHTML = '<div class="cek-nama"><b>' + esc(d.nama) + '</b><span>' + esc(d.nip) + (d.jabatan ? ' · ' + esc(d.jabatan) : '') + '</span></div>' +
+          isianEmail(serti && !d.emailSamar, d.emailSamar ? 'Kosongkan untuk memakai email tersimpan (' + d.emailSamar + ').' : (serti ? 'Link sertifikat dikirim ke email ini.' : ''));
+      } else {
+        st.staf = { manual: true };
+        $('hasil-nip').innerHTML = '<div class="pesan peringatan">NIP belum terdaftar di data pegawai Gizi-Link. Silakan isi manual.</div>' +
+          '<label class="f"><span>Nama lengkap & gelar <i>*</i></span><input type="text" id="nama" autocomplete="name"></label>' +
+          '<label class="f"><span>Jabatan / unit kerja</span><input type="text" id="instansi" placeholder="Contoh: PLP Laboratorium Gizi"></label>' +
+          isianEmail(serti, serti ? 'Link sertifikat dikirim ke email ini.' : '');
+        $('nama').addEventListener('input', perbaruiPratinjau);
+      }
+      tampilAkhir();
+    } catch (e) { H.toast(e.message, true); }
+    finally { btn.disabled = false; btn.textContent = 'Cek'; }
+  }
+
   function namaSekarang() {
+    if (st.kategori === 'STAF') return st.staf && !st.staf.manual ? st.staf.nama || '' : ($('nama') ? $('nama').value : '');
     if (st.pakaiSso || (st.mhs && !st.mhs.manual)) return st.mhs ? st.mhs.nama : '';
     return $('nama') ? $('nama').value : '';
   }
@@ -221,7 +279,15 @@
     var data = { k: kId, kategori: st.kategori };
     var opsi = {};
     if (!st.kategori) return H.toast('Pilih kategori peserta dulu.', true);
-    if (st.kategori === 'MHS' && !st.pakaiSso) {
+    if (st.kategori === 'STAF' && !st.pakaiSso) {
+      opsi.tanpaToken = true;
+      if (!st.nipDicek || !st.staf) return H.toast('Ketik NIP lalu tekan Cek.', true);
+      data.nipNik = st.nipDicek;
+      if (st.staf.manual) {
+        data.nama = $('nama').value.trim(); data.instansi = $('instansi').value.trim();
+        if (data.nama.length < 3) return H.toast('Nama lengkap wajib diisi.', true);
+      }
+    } else if (st.kategori === 'MHS' && !st.pakaiSso) {
       opsi.tanpaToken = true;
       if (!st.nimDicek || !st.mhs) return H.toast('Ketik NIM lalu tekan Cek.', true);
       data.nim = st.nimDicek;
@@ -239,7 +305,8 @@
     }
     data.email = $('email') ? $('email').value.trim() : '';
     if (data.email && !/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(data.email)) return H.toast('Format email tidak valid.', true);
-    if ((st.kategori === 'CI' || st.kategori === 'UMUM') && KEG.modeSertifikat !== 'tanpa' && !data.email) return H.toast('Email wajib diisi agar sertifikat dapat dikirim.', true);
+    var butuhEmail = st.kategori === 'CI' || st.kategori === 'UMUM' || (st.kategori === 'STAF' && !st.pakaiSso && !(st.staf && st.staf.emailSamar));
+    if (butuhEmail && KEG.modeSertifikat !== 'tanpa' && !data.email) return H.toast('Email wajib diisi agar sertifikat dapat dikirim.', true);
     if (!pad || pad.kosong()) return H.toast('Silakan tanda tangan dulu.', true);
     data.ttd = pad.dataUrl();
 
@@ -264,7 +331,8 @@
       serti = '<a class="tbl penuh mt" href="' + H.linkSertifikat(kId, d.unduh) + '">📄 Unduh Sertifikat</a>' +
         (d.emailTerkirim ? '<p class="kecil">Link sertifikat juga sudah dikirim ke email Anda.</p>' : '');
     } else if (d.modeSertifikat === 'setelah' || (d.modeSertifikat === 'langsung' && !d.sertifikatSiap)) {
-      serti = '<div class="pesan info mt">Sertifikat akan dikirim ke email setelah kegiatan. Mahasiswa juga dapat mengunduhnya di menu <b>Daftar Hadir Kegiatan</b> pada Gizi-Link.</div>';
+      serti = '<div class="pesan info mt">Sertifikat akan dikirim ke email Anda setelah diterbitkan panitia.' +
+        (st.kategori === 'MHS' ? ' Anda juga dapat mengunduhnya di menu <b>Daftar Hadir Kegiatan</b> pada Gizi-Link.' : '') + '</div>';
     }
     isi.innerHTML = pita() + '<div class="kartu pusat">' +
       '<div class="sukses-ikon">' + (d.dobel ? 'ℹ️' : '✅') + '</div>' +
@@ -275,7 +343,7 @@
       '</div>';
     $('lagi').onclick = function () {
       try { localStorage.removeItem(kunciLokal()); } catch (e) { }
-      pad = null; st = { kategori: '', mhs: null, nimDicek: '', pakaiSso: false };
+      pad = null; st = { kategori: '', mhs: null, nimDicek: '', pakaiSso: false, staf: null, nipDicek: '' };
       tampilForm();
       window.scrollTo(0, 0);
     };
