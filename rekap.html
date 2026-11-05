@@ -38,6 +38,7 @@
     .pengesahan { margin-top: 14px; display: flex; justify-content: flex-end; page-break-inside: avoid; }
     .pengesahan div { width: 75mm; line-height: 1.45; }
     .pengesahan .ruang { height: 20mm; }
+    .pengesahan .gbr { height: 24mm; display: block; margin: 0 auto; max-width: 60mm; object-fit: contain; }
     .jumlah { margin-top: 6px; font-size: 10pt; }
     .muat { text-align: center; padding: 60px; font-family: system-ui, sans-serif; color: #555; }
     @media print {
@@ -70,6 +71,21 @@
     document.title = 'Daftar Hadir - ' + keg.nama;
 
     function nipFormat(n) { return n ? 'NIP. ' + n : ''; }
+    var gbr = null;
+    if (d.gambar && (d.gambar.ttd || d.gambar.stempel)) {
+      gbr = await new Promise(function (res) {
+        var c = document.createElement('canvas'); c.width = 700; c.height = 300; var x = c.getContext('2d'), n = 0, butuh = (d.gambar.ttd ? 1 : 0) + (d.gambar.stempel ? 1 : 0);
+        var s = new Image(), t = new Image();
+        function selesai() {
+          if (++n < butuh) return;
+          if (d.gambar.stempel) { var sh = 280, sw = sh * s.naturalWidth / s.naturalHeight; x.globalAlpha = 0.9; x.drawImage(s, 10, 10, sw, sh); x.globalAlpha = 1; }
+          if (d.gambar.ttd) { var tw = Math.min(460, 220 * t.naturalWidth / t.naturalHeight), th = tw * t.naturalHeight / t.naturalWidth; x.drawImage(t, d.gambar.stempel ? 150 : 40, (300 - th) / 2, tw, th); }
+          res(c.toDataURL('image/png'));
+        }
+        if (d.gambar.stempel) { s.onload = selesai; s.onerror = selesai; s.src = d.gambar.stempel; }
+        if (d.gambar.ttd) { t.onload = selesai; t.onerror = selesai; t.src = d.gambar.ttd; }
+      });
+    }
 
     function gambar() {
       var kat = document.getElementById('kat').value, urut = document.getElementById('urut').value;
@@ -101,7 +117,7 @@
         (baris || '<tr><td colspan="5" style="text-align:center;padding:20px">Belum ada peserta.</td></tr>') + '</tbody></table>' +
         '<div class="jumlah">Jumlah peserta hadir: <b>' + list.length + '</b> orang</div>' +
         '<div class="pengesahan"><div>' + esc(p.kota || 'Makassar') + ', ' + esc(H.tglPanjang(keg.tanggal)) + '<br>' +
-        'Mengetahui,<br>' + esc(p.pengesahan_jabatan || 'Ketua Jurusan Gizi') + ',<div class="ruang"></div>' +
+        'Mengetahui,<br>' + esc(p.pengesahan_jabatan || 'Ketua Jurusan Gizi') + ',' + (gbr ? '<img class="gbr" src="' + gbr + '" alt="">' : '<div class="ruang"></div>') +
         '<b><u>' + esc(p.pengesahan_nama || '') + '</u></b><br>' + esc(nipFormat(p.pengesahan_nip)) + '</div></div>';
     }
     document.getElementById('kat').onchange = gambar;

@@ -76,13 +76,18 @@
       '<div id="blok-akhir" hidden>' +
       '<div id="pratinjau-nama"></div>' +
       (k.wajibKode ? '<label class="f"><span>🔐 Kode kehadiran <i>*</i></span>' +
-        '<input type="text" id="kode-hadir" inputmode="numeric" maxlength="4" autocomplete="off" placeholder="4 angka" style="font-size:22px;letter-spacing:8px;text-align:center;font-weight:700">' +
-        '<small>Kode diumumkan panitia di ruangan atau di layar Zoom selama kegiatan.</small></label>' : '') +
+        '<div class="link-kotak"><input type="text" id="kode-hadir" inputmode="numeric" maxlength="4" autocomplete="off" placeholder="4 angka" style="font-size:22px;letter-spacing:8px;text-align:center;font-weight:700">' +
+        '<button type="button" class="tbl lembut" id="cek-kode">Cek</button></div>' +
+        '<small id="kode-ket">Kode diumumkan panitia di ruangan atau di layar Zoom selama kegiatan.</small></label>' : '') +
+      '<div id="blok-lanjut"' + (k.wajibKode ? ' hidden' : '') + '>' +
+      (k.evaluasi ? '<div class="evaluasi" id="evaluasi"><h3>⭐ Penilaian kegiatan</h3><p class="sub kecil">Wajib diisi. Ketuk bintang: 1 = sangat kurang, 5 = sangat baik.</p><div id="ev-aspek"></div>' +
+        (k.daftarNarasumber.length ? '<h3 style="margin-top:12px">🎤 Penilaian narasumber</h3><div id="ev-nara"></div>' : '') +
+        '<label class="f" style="margin:12px 0 0"><span>Saran untuk kegiatan berikutnya <em class="kecil" style="font-style:normal">(opsional)</em></span><textarea id="ev-saran" rows="2" maxlength="1000" spellcheck="true" lang="id"></textarea></label></div>' : '') +
       '<label class="f"><span>Tanda tangan <i>*</i></span></label>' +
       '<div class="ttd-kotak" id="ttd-kotak"><canvas id="ttd"></canvas><div class="garis-ttd"></div><div class="petunjuk" id="ttd-petunjuk">✍️ Tanda tangan di sini</div></div>' +
       '<div class="baris antara" style="margin:6px 0 16px"><span class="kecil">Gunakan jari atau mouse.</span><button type="button" class="tbl garis kecil" id="ttd-ulang">↺ Ulangi</button></div>' +
       '<button type="submit" class="tbl penuh" id="kirim">Kirim Daftar Hadir</button>' +
-      '</div></form>';
+      '</div></div></form>';
 
     $('kategori').addEventListener('click', function (e) {
       var b = e.target.closest('button[data-k]');
@@ -91,6 +96,19 @@
     });
     $('form').addEventListener('submit', kirim);
     $('ttd-ulang').onclick = function () { pad && pad.hapus(); };
+    st.kodeOk = !k.wajibKode;
+    if (k.wajibKode) {
+      $('cek-kode').onclick = cekKode;
+      $('kode-hadir').addEventListener('input', function () {
+        this.value = this.value.replace(/\D/g, '').slice(0, 4);
+        if (st.kodeOk) { st.kodeOk = false; $('blok-lanjut').hidden = true; $('kode-ket').textContent = 'Kode diumumkan panitia di ruangan atau di layar Zoom selama kegiatan.'; $('kode-ket').style.color = ''; }
+        if (this.value.length === 4) cekKode();
+      });
+    }
+    if (k.evaluasi) {
+      st.evA = k.aspek.map(function (a) { var b = H.bintang(a); $('ev-aspek').appendChild(b); return b; });
+      st.evN = k.daftarNarasumber.map(function (n) { var b = H.bintang(n); $('ev-nara').appendChild(b); return b; });
+    }
 
     if (st.pakaiSso && ssoStaf) tampilSsoStaf(ssoStaf);
     else if (st.pakaiSso) tampilSso(sso);
@@ -267,6 +285,25 @@
       (n ? esc(H.namaSertifikat(n)) : '—') + '</b><br><span class="kecil">Pastikan nama & gelar sudah benar sebelum dikirim.</span></div>';
   }
 
+  async function cekKode() {
+    var v = ($('kode-hadir').value || '').replace(/\D/g, '');
+    if (v.length !== 4) return H.toast('Masukkan 4 angka kode kehadiran.', true);
+    var btn = $('cek-kode'); btn.disabled = true; btn.innerHTML = '<span class="putar kcl"></span>';
+    try {
+      var d = await H.api('cekKode', { k: kId, kode: v, perangkat: H.perangkat() }, { tanpaToken: true });
+      if (!d.ok) {
+        $('kode-ket').textContent = '✖ ' + d.pesan; $('kode-ket').style.color = 'var(--merah)';
+        $('kode-hadir').select(); return;
+      }
+      st.kodeOk = true;
+      $('kode-ket').textContent = '✔ Kode benar. Silakan lanjutkan' + (KEG.evaluasi ? ' mengisi penilaian.' : '.'); $('kode-ket').style.color = '#1E7B3A';
+      $('blok-lanjut').hidden = false;
+      if (pad) pad.ukur();
+      var t = $('evaluasi') || $('ttd-kotak'); if (t) t.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    } catch (e) { H.toast(e.message, true); }
+    finally { btn.disabled = false; btn.textContent = 'Cek'; }
+  }
+
   function tampilAkhir() {
     $('blok-akhir').hidden = false;
     perbaruiPratinjau();
@@ -314,6 +351,21 @@
       data.kodeHadir = ($('kode-hadir').value || '').replace(/\D/g, '');
       if (data.kodeHadir.length !== 4) { $('kode-hadir').focus(); return H.toast('Masukkan 4 angka kode kehadiran.', true); }
     }
+    if (KEG.wajibKode && !st.kodeOk) return H.toast('Tekan Cek untuk memeriksa kode kehadiran.', true);
+    if (KEG.evaluasi) {
+      var kosong = st.evA.concat(st.evN).filter(function (b) { return !b.dataset.nilai; });
+      if (kosong.length) {
+        kosong.forEach(function (b) { b.classList.add('kurang'); });
+        kosong[0].scrollIntoView({ behavior: 'smooth', block: 'center' });
+        return H.toast('Lengkapi semua penilaian bintang (' + kosong.length + ' belum diisi).', true);
+      }
+      data.evaluasi = {
+        a: st.evA.map(function (b) { return Number(b.dataset.nilai); }),
+        n: st.evN.map(function (b) { return Number(b.dataset.nilai); }),
+        s: $('ev-saran').value.trim()
+      };
+    }
+    data.perangkat = H.perangkat();
     if (!pad || pad.kosong()) return H.toast('Silakan tanda tangan dulu.', true);
     data.ttd = pad.dataUrl();
 
@@ -321,7 +373,7 @@
     try {
       var d = await H.api('hadir', data, opsi);
       if (!d.ok) {
-        if (d.kode === 'KODE' && $('kode-hadir')) { H.toast(d.pesan, true); $('kode-hadir').value = ''; $('kode-hadir').focus(); return; }
+        if (d.kode === 'KODE' && $('kode-hadir')) { H.toast(d.pesan, true); st.kodeOk = false; $('blok-lanjut').hidden = true; $('kode-hadir').value = ''; $('kode-hadir').focus(); return; }
         $('pesan').innerHTML = '<div class="pesan galat">' + esc(d.pesan) + '</div>'; window.scrollTo({ top: 0, behavior: 'smooth' }); return;
       }
       simpanTerakhir(d);
@@ -332,7 +384,7 @@
 
   /* Ingat pengisian terakhir di perangkat ini supaya tidak terkirim dua kali saat halaman dibuka ulang */
   function kunciLokal() { return 'hadir_' + kId; }
-  function simpanTerakhir(d) { try { localStorage.setItem(kunciLokal(), JSON.stringify({ nama: d.nama, waktu: d.waktu, modeSertifikat: d.modeSertifikat, sertifikatSiap: d.sertifikatSiap, unduh: d.unduh, emailTerkirim: d.emailTerkirim, dobel: d.dobel })); } catch (e) { } }
+  function simpanTerakhir(d) { try { localStorage.setItem(kunciLokal(), JSON.stringify({ nama: d.nama, waktu: d.waktu, modeSertifikat: d.modeSertifikat, sertifikatSiap: d.sertifikatSiap, unduh: d.unduh, emailTerkirim: d.emailTerkirim, dobel: d.dobel, jumlahMateri: d.jumlahMateri })); } catch (e) { } }
   function bacaTerakhir() { try { return JSON.parse(localStorage.getItem(kunciLokal()) || 'null'); } catch (e) { return null; } }
 
   function tampilSukses(d, dariSimpanan) {
@@ -349,11 +401,12 @@
       '<h2>' + (d.dobel ? 'Anda sudah tercatat hadir' : 'Terima kasih, kehadiran tercatat!') + '</h2>' +
       '<p><b>' + esc(d.nama) + '</b><br><span class="kecil">' + esc(d.waktu || '') + ' WITA</span></p>' +
       serti +
+      (d.jumlahMateri ? '<a class="tbl garis penuh mt" href="materi.html?k=' + encodeURIComponent(kId) + '">📚 Unduh materi narasumber (' + d.jumlahMateri + ')</a>' : '') +
       '<div class="garis-atas"><button class="tbl garis kecil" id="lagi">Isi untuk peserta lain di perangkat ini</button></div>' +
       '</div>';
     $('lagi').onclick = function () {
       try { localStorage.removeItem(kunciLokal()); } catch (e) { }
-      pad = null; st = { kategori: '', mhs: null, nimDicek: '', pakaiSso: false, staf: null, nipDicek: '' };
+      pad = null; st = { kategori: '', mhs: null, nimDicek: '', pakaiSso: false, staf: null, nipDicek: '', kodeOk: false };
       tampilForm();
       window.scrollTo(0, 0);
     };

@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="id">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Laporan Kegiatan · Cetak / PDF</title>
+  <link rel="icon" href="icons/icon-192.png">
+  <script src="js/config.js"></script>
+  <script src="https://jurusan-gizi.github.io/sso.js"></script>
+  <style>
+    html, body { margin: 0; height: 100%; font-family: system-ui, -apple-system, 'Segoe UI', sans-serif; background: #E9EEF1; }
+    .alat { position: fixed; top: 0; left: 0; right: 0; height: 56px; background: #fff; border-bottom: 3px solid #00B8AD; display: flex; align-items: center; gap: 12px; padding: 0 16px; z-index: 5; }
+    .alat b { color: #007F7F; margin-right: auto; }
+    .alat button { font: inherit; font-weight: 600; padding: 8px 14px; border-radius: 8px; border: 0; background: #00B8AD; color: #fff; cursor: pointer; }
+    .alat button:disabled { opacity: .5; }
+    #status { color: #64748B; font-size: 14px; }
+    iframe { position: fixed; top: 59px; left: 0; width: 100%; height: calc(100% - 59px); border: 0; background: #E9EEF1; }
+  </style>
+</head>
+<body data-tanpa-gizilink>
+  <div class="alat"><b>📑 Laporan Kegiatan</b><span id="status">Menyiapkan…</span><button id="cetak" disabled>🖨️ Cetak / Simpan PDF</button></div>
+  <iframe id="dok" title="Pratinjau laporan"></iframe>
+  <script src="vendor/pdf-lib.min.js"></script>
+  <script src="vendor/pdf.min.js"></script>
+  <script src="vendor/qrcode.js"></script>
+  <script src="js/umum.js"></script>
+  <script src="js/cover.js"></script>
+  <script src="js/laporan.js"></script>
+  <script>
+  (async function () {
+    var st = document.getElementById('status');
+    var k = new URLSearchParams(location.search).get('k');
+    if (!window.GiziSSO || !GiziSSO.getStaf()) { st.textContent = 'Silakan masuk Gizi-Link sebagai dosen/staf terlebih dahulu.'; return; }
+    try {
+      var bahan = await Laporan.siapkan(k, function (t) { st.textContent = t; });
+      st.textContent = 'Menyusun halaman…';
+      var html = Laporan.keHtml(Laporan.model(bahan), 'Laporan ' + bahan.d.kegiatan.nama);
+      var f = document.getElementById('dok');
+      f.srcdoc = html;
+      f.onload = function () {
+        st.textContent = 'Siap. Pilih "Simpan sebagai PDF" pada jendela cetak.';
+        document.title = 'Laporan Kegiatan - ' + bahan.d.kegiatan.nama;
+        var b = document.getElementById('cetak'); b.disabled = false;
+        b.onclick = function () { f.contentWindow.focus(); f.contentWindow.print(); };
+      };
+    } catch (e) { st.textContent = '⚠️ ' + e.message; }
+  })();
+  </script>
+</body>
+</html>

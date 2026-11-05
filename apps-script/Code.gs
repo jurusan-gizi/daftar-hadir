@@ -37,6 +37,7 @@ var SASARAN = {
   D3: 'D3 Gizi',
   D4: 'D4 Gizi dan Dietetika',
   PROF: 'Profesi Dietisien',
+  STAF: 'Dosen/PLP/Tendik',
   CI: 'CI (Clinical Instructor)',
   UMUM: 'Umum'
 };
@@ -46,22 +47,39 @@ var SHEETS = {
   Kegiatan: ['id', 'nama', 'jenis', 'tanggal', 'waktu', 'tempat', 'narasumber', 'penyelenggara',
     'sasaran', 'bukaAbsen', 'tutupAbsen', 'statusAbsen', 'modeSertifikat', 'templatId', 'templatNama',
     'templatHalaman', 'templatTotal', 'posisi', 'sertifikatDibuka', 'status',
-    'dibuatOleh', 'dibuatPada', 'diubahOleh', 'diubahPada'],
+    'dibuatOleh', 'dibuatPada', 'diubahOleh', 'diubahPada', 'wajibKode', 'kodeHadir', 'evaluasi'],
   Kehadiran: ['id', 'kegiatanId', 'waktu', 'kategori', 'nim', 'nama', 'prodi', 'kelas', 'instansi',
     'nipNik', 'email', 'sumber', 'kode', 'emailStatus', 'emailWaktu', 'diubahOleh', 'diubahPada'],
   // Gambar tanda tangan disimpan terpisah agar tab Kehadiran tetap ringan dibaca
   TTD: ['id', 'kegiatanId', 'ttd'],
   EmailMahasiswa: ['nim', 'email', 'diubahPada'],
+  // Evaluasi kepuasan peserta (5 aspek + nilai per narasumber)
+  Evaluasi: ['id', 'kegiatanId', 'hadirId', 'kategori', 'a1', 'a2', 'a3', 'a4', 'a5', 'narasumber', 'saran', 'waktu'],
+  // Notulensi & isian laporan (JSON per kegiatan)
+  Laporan: ['kegiatanId', 'data', 'diubahOleh', 'diubahPada'],
+  // Foto dokumentasi & materi narasumber (file di Google Drive)
+  Berkas: ['id', 'kegiatanId', 'jenis', 'nama', 'fileId', 'mime', 'ukuran', 'narasumber', 'urutan', 'diunggahOleh', 'waktu'],
   Pengaturan: ['kunci', 'nilai', 'keterangan'],
   Log: ['waktu', 'oleh', 'aksi', 'detail']
 };
+
+var ASPEK_EVALUASI = [
+  'Materi sesuai dengan kebutuhan',
+  'Narasumber menguasai materi',
+  'Penyampaian jelas dan waktu cukup',
+  'Penyelenggaraan (ruangan/Zoom dan teknis)',
+  'Manfaat kegiatan'
+];
+var MAKS_BERKAS = 20 * 1024 * 1024;
 
 var PENGATURAN_AWAL = [
   ['pengesahan_jabatan', 'Ketua Jurusan Gizi', 'Jabatan penanda tangan rekap daftar hadir'],
   ['pengesahan_nama', 'Manjilala, S.Gz, M.Gizi', 'Nama penanda tangan rekap'],
   ['pengesahan_nip', '197710092006041010', 'NIP penanda tangan rekap'],
   ['kota', 'Makassar', 'Kota pada tanggal pengesahan'],
-  ['unit', 'Jurusan Gizi', 'Nama unit pada kop rekap']
+  ['unit', 'Jurusan Gizi', 'Nama unit pada kop rekap'],
+  ['ttd_file', '', 'ID file Drive gambar tanda tangan pengesah (diunggah dari menu Pengaturan)'],
+  ['stempel_file', '', 'ID file Drive gambar stempel (diunggah dari menu Pengaturan)']
 ];
 
 /* ===================== SETUP ===================== */
@@ -76,7 +94,7 @@ function setup() {
     });
     sh.getRange(1, 1, 1, ada.length).setFontWeight('bold').setBackground('#00B8AD').setFontColor('#ffffff');
     sh.setFrozenRows(1);
-    sh.getRange('A:ZZ').setNumberFormat('@');   // semua teks: tanggal & NIM tidak berubah format
+    jadikanTeks_(sh);   // semua sel teks biasa: tanggal & NIM tidak diubah Google Sheet
   });
   var def = ss.getSheetByName('Sheet1') || ss.getSheetByName('Lembar1') || ss.getSheetByName('Lembar 1');
   if (def && ss.getSheets().length > 1) ss.deleteSheet(def);
@@ -120,8 +138,12 @@ function doPost(e) {
     // ---- Aksi publik (peserta tanpa login) ----
     if (a === 'info') return json_(info_(req));
     if (a === 'cekNim') return json_(cekNim_(req));
+    if (a === 'cekNip') return json_(cekNip_(req));
     if (a === 'hadir') return json_(hadir_(req));
     if (a === 'templat') return json_(templatPeserta_(req));
+    if (a === 'cekKode') return json_(cekKode_(req));
+    if (a === 'materi') return json_(materiPublik_(req));
+    if (a === 'unduhMateri') return json_(unduhMateri_(req));
 
     // ---- Dosen/staf ----
     var staf = verifikasiStafSSO_(req.token);
@@ -135,6 +157,7 @@ function doPost(e) {
         case 'simpanKegiatan': return json_(simpanKegiatan_(u, req));
         case 'hapusKegiatan': return json_(hapusKegiatan_(u, req));
         case 'aturAbsen': return json_(aturAbsen_(u, req));
+        case 'gantiKode': return json_(gantiKode_(u, req));
         case 'uploadTemplat': return json_(uploadTemplat_(u, req));
         case 'simpanPosisi': return json_(simpanPosisi_(u, req));
         case 'ambilTemplat': return json_(ambilTemplatAdmin_(req));
@@ -144,6 +167,14 @@ function doPost(e) {
         case 'kirimSertifikat': return json_(kirimSertifikat_(u, req));
         case 'bukaSertifikat': return json_(bukaSertifikat_(u, req));
         case 'simpanPengaturan': return json_(simpanPengaturan_(u, req));
+        case 'gambarPengesahan': return json_(gambarPengesahan_(u, req));
+        case 'ambilLaporan': return json_(ambilLaporan_(req));
+        case 'simpanLaporan': return json_(simpanLaporan_(u, req));
+        case 'unggahBerkas': return json_(unggahBerkas_(u, req));
+        case 'hapusBerkas': return json_(hapusBerkas_(u, req));
+        case 'urutBerkas': return json_(urutBerkas_(u, req));
+        case 'ambilBerkas': return json_(ambilBerkas_(req));
+        case 'dataLaporan': return json_(dataLaporan_(req));
       }
       return json_({ ok: false, pesan: 'Aksi tidak dikenal.' });
     }
@@ -165,7 +196,13 @@ function json_(o) {
 
 /* ===================== HELPER SHEET ===================== */
 function sh_(nama) {
-  var sh = SpreadsheetApp.getActive().getSheetByName(nama);
+  var ss = SpreadsheetApp.getActive(), sh = ss.getSheetByName(nama);
+  if (!sh && SHEETS[nama]) {   // tab baru dari pembaruan versi dibuat otomatis
+    sh = ss.insertSheet(nama);
+    sh.getRange(1, 1, 1, SHEETS[nama].length).setValues([SHEETS[nama]]).setFontWeight('bold').setBackground('#00B8AD').setFontColor('#ffffff');
+    sh.setFrozenRows(1);
+    jadikanTeks_(sh);
+  }
   if (!sh) throw new Error('Tab "' + nama + '" belum ada. Jalankan fungsi setup.');
   return sh;
 }
@@ -178,15 +215,49 @@ function rows_(nama) {
   var h = data[0].map(String), out = [];
   for (var r = 1; r < data.length; r++) {
     var o = { _row: r + 1 };
-    for (var c = 0; c < h.length; c++) o[h[c]] = data[r][c] === null ? '' : String(data[r][c]);
+    for (var c = 0; c < h.length; c++) o[h[c]] = teksSel_(data[r][c], h[c]);
     out.push(o);
   }
   return out;
 }
 
+/** Format kolom waktu bila sel terlanjur dibaca Google Sheet sebagai tanggal. */
+var POLA_WAKTU = {
+  tanggal: 'yyyy-MM-dd', bukaAbsen: "yyyy-MM-dd'T'HH:mm", tutupAbsen: "yyyy-MM-dd'T'HH:mm",
+  waktu: 'yyyy-MM-dd HH:mm:ss', emailWaktu: 'yyyy-MM-dd HH:mm', dibuatPada: 'yyyy-MM-dd HH:mm', diubahPada: 'yyyy-MM-dd HH:mm'
+};
+function teksSel_(v, kolom) {
+  if (v === null || v === undefined) return '';
+  if (v instanceof Date) return Utilities.formatDate(v, CONFIG.ZONA, POLA_WAKTU[kolom] || 'yyyy-MM-dd HH:mm');
+  return String(v);
+}
+
+/** Ubah seluruh sheet menjadi format Teks biasa tanpa merusak isi yang sudah ada. */
+function jadikanTeks_(sh) {
+  var nr = sh.getMaxRows(), nc = sh.getMaxColumns();
+  var lr = sh.getLastRow(), lc = sh.getLastColumn(), data = null, h = [];
+  if (lr > 0 && lc > 0) {
+    data = sh.getRange(1, 1, lr, lc).getValues();
+    h = data[0].map(String);
+    data = data.map(function (r, i) { return r.map(function (v, c) { return i === 0 ? String(v) : teksSel_(v, h[c]); }); });
+  }
+  sh.getRange(1, 1, nr, nc).setNumberFormat('@');
+  if (data) sh.getRange(1, 1, lr, lc).setValues(data);
+}
+
+/** Jalankan sekali bila tanggal/jam tampil aneh (mis. "Sat Nov 14 2026 00:00:00 GMT+0800"). */
+function perbaikiFormat() {
+  Object.keys(SHEETS).forEach(function (n) { var sh = SpreadsheetApp.getActive().getSheetByName(n); if (sh) jadikanTeks_(sh); });
+  Logger.log('Format teks diperbaiki.');
+}
+
 function header_(nama) {
   var sh = sh_(nama);
-  return sh.getRange(1, 1, 1, sh.getLastColumn()).getValues()[0].map(String);
+  var h = sh.getRange(1, 1, 1, sh.getLastColumn()).getValues()[0].map(String);
+  (SHEETS[nama] || []).forEach(function (kol) {   // kolom baru (pembaruan versi) ditambahkan otomatis
+    if (h.indexOf(kol) < 0) { h.push(kol); sh.getRange(1, h.length).setValue(kol).setNumberFormat('@'); }
+  });
+  return h;
 }
 
 function tambah_(nama, o) {
@@ -291,6 +362,24 @@ function mahasiswa_() {
   return o;
 }
 
+/** Data dosen/PLP/tendik dari sheet Staf portal: {IDNORMAL: {id, nama, jabatan}}; di-cache 10 menit. */
+function staf_() {
+  var cache = CacheService.getScriptCache();
+  var c = cache.get('staf_v1');
+  if (c) { try { return JSON.parse(c); } catch (e) { } }
+  var sh = portal_().getSheetByName('Staf');
+  var data = sh.getDataRange().getValues(), h = data[0].map(function (x) { return String(x).trim(); });
+  var iId = h.indexOf('ID'), iNa = h.indexOf('Nama'), iJ = h.indexOf('Jabatan');
+  var o = {};
+  for (var r = 1; r < data.length; r++) {
+    var id = String(data[r][iId] || '').trim(), n = normId_(id);
+    if (n.length < 8 || !/\d{8}/.test(n)) continue;   // lewati akun non-pegawai (mis. "admin")
+    o[n] = { id: id, nama: String(data[r][iNa] || '').trim(), jabatan: iJ >= 0 ? String(data[r][iJ] || '').trim() : '' };
+  }
+  try { cache.put('staf_v1', JSON.stringify(o), 600); } catch (e) { }
+  return o;
+}
+
 /** Peran admin dari kolom "Daftar Hadir" sheet Staf portal: 'superadmin' | 'admin' | ''. */
 function peranAdmin_(staf) {
   var target = normId_(staf.id);
@@ -346,7 +435,9 @@ function infoPublik_(k) {
     id: k.id, nama: k.nama, jenis: k.jenis, tanggal: k.tanggal, waktu: k.waktu, tempat: k.tempat,
     narasumber: k.narasumber, penyelenggara: k.penyelenggara, sasaran: sasaranList_(k),
     bukaAbsen: k.bukaAbsen, tutupAbsen: k.tutupAbsen, absen: statusAbsen_(k),
-    modeSertifikat: k.modeSertifikat || 'tanpa', adaTemplat: !!k.templatId
+    modeSertifikat: k.modeSertifikat || 'tanpa', adaTemplat: !!k.templatId,
+    wajibKode: k.wajibKode === 'YA',
+    evaluasi: k.evaluasi === 'YA', daftarNarasumber: daftarNarasumber_(k.narasumber), aspek: ASPEK_EVALUASI
   };
 }
 
@@ -366,6 +457,15 @@ function cekNim_(req) {
   return { ok: true, ditemukan: true, nim: m.nim, nama: m.nama, prodi: m.prodi, prodiKode: kodeProdi_(m.prodi), kelas: m.kelas, emailSamar: em ? samarEmail_(em.email) : '' };
 }
 
+function cekNip_(req) {
+  var n = normId_(req.nip);
+  if (n.length < 8) return { ok: false, pesan: 'NIP terlalu pendek.' };
+  var p = staf_()[n];
+  if (!p) return { ok: true, ditemukan: false };
+  var em = rows_('EmailMahasiswa').filter(function (r) { return normId_(r.nim) === n; })[0];
+  return { ok: true, ditemukan: true, nip: p.id, nama: p.nama, jabatan: p.jabatan, emailSamar: em ? samarEmail_(em.email) : '' };
+}
+
 /**
  * Simpan kehadiran. req: {k, token?, kategori: 'MHS'|'CI'|'UMUM', nim, nama, prodiKode, instansi, nipNik, email, ttd}
  */
@@ -381,15 +481,51 @@ function hadir_(req) {
   if (ttd.indexOf('data:image/png;base64,') !== 0 || ttd.length < 200) return { ok: false, pesan: 'Tanda tangan belum dibuat.' };
   if (ttd.length > CONFIG.MAKS_TTD) return { ok: false, pesan: 'Gambar tanda tangan terlalu besar. Tekan Ulangi lalu tanda tangan lagi.' };
 
+  // Kode kehadiran: diumumkan panitia di ruangan / layar Zoom
+  if (k.wajibKode === 'YA') {
+    var hk = periksaKode_(k, req.kodeHadir, req.perangkat || req.nim || req.nipNik || req.email || req.nama);
+    if (!hk.ok) return hk;
+  }
+
+  // Evaluasi kepuasan (wajib bila diaktifkan)
+  var ev = null;
+  if (k.evaluasi === 'YA') {
+    ev = req.evaluasi || {};
+    var a = ev.a || [], nr = ev.n || [], jn = daftarNarasumber_(k.narasumber).length;
+    var nilaiOk = function (v) { return [1, 2, 3, 4, 5].indexOf(Number(v)) >= 0; };
+    if (a.length !== ASPEK_EVALUASI.length || !a.every(nilaiOk)) return { ok: false, pesan: 'Lengkapi semua penilaian kegiatan (bintang 1–5).' };
+    if (nr.length !== jn || !nr.every(nilaiOk)) return { ok: false, pesan: 'Lengkapi penilaian untuk setiap narasumber.' };
+  }
+
   var mode = k.modeSertifikat || 'tanpa';
   var email = bersih_(req.email, 120).toLowerCase();
   if (email && !emailValid_(email)) return { ok: false, pesan: 'Format email tidak valid.' };
 
   var d = { kategori: '', nim: '', nama: '', prodi: '', kelas: '', instansi: '', nipNik: '', email: email, sumber: '' };
   var mhsSso = verifikasiSSO_(req.token);
+  var stafSso = verifikasiStafSSO_(req.token);
   var kat = String(req.kategori || '');
 
-  if (kat === 'MHS' || mhsSso) {
+  if (kat === 'STAF') {
+    if (sas.indexOf('STAF') < 0) return { ok: false, pesan: 'Kategori Dosen/PLP/Tendik tidak dibuka untuk kegiatan ini.' };
+    d.kategori = 'Dosen/PLP/Tendik'; d.prodi = 'Dosen/PLP/Tendik';
+    var pg = null;
+    if (stafSso) { pg = staf_()[normId_(stafSso.id)] || { id: stafSso.id, nama: stafSso.nama, jabatan: '' }; d.sumber = 'Gizi-Link'; }
+    else {
+      var nip = normId_(req.nipNik);
+      if (nip.length >= 8) pg = staf_()[nip] || null;
+      d.sumber = pg ? 'NIP' : 'manual';
+    }
+    if (pg) {
+      d.nama = pg.nama; d.nipNik = pg.id; d.instansi = pg.jabatan || bersih_(req.instansi, 150) || 'Jurusan Gizi';
+    } else {
+      d.nama = bersih_(req.nama, 150); d.nipNik = bersih_(req.nipNik, 30); d.instansi = bersih_(req.instansi, 150) || 'Jurusan Gizi';
+      if (d.nama.length < 3) return { ok: false, pesan: 'Nama lengkap wajib diisi.' };
+    }
+    var simpanS = d.nipNik ? rows_('EmailMahasiswa').filter(function (r) { return normId_(r.nim) === normId_(d.nipNik); })[0] : null;
+    if (!d.email && simpanS) d.email = simpanS.email;
+    if (mode !== 'tanpa' && !d.email) return { ok: false, pesan: 'Email wajib diisi agar sertifikat dapat dikirim.' };
+  } else if (kat === 'MHS' || mhsSso) {
     d.kategori = 'Mahasiswa';
     var portal = null;
     if (mhsSso) {
@@ -436,6 +572,8 @@ function hadir_(req) {
       var r = ada[i];
       var sama = d.kategori === 'Mahasiswa'
         ? (r.kategori === 'Mahasiswa' && normNim_(r.nim) === normNim_(d.nim))
+        : d.kategori === 'Dosen/PLP/Tendik' && d.nipNik
+        ? (r.kategori === d.kategori && normId_(r.nipNik) === normId_(d.nipNik))
         : (r.kategori === d.kategori && ((d.email && r.email === d.email) || (!d.email && normNama_(r.nama) === normNama_(d.nama))));
       if (sama) return { dobel: true, r: r };
     }
@@ -446,7 +584,15 @@ function hadir_(req) {
     };
     tambah_('Kehadiran', row);
     sh_('TTD').appendRow([row.id, k.id, ttd]);
+    if (ev) {
+      tambah_('Evaluasi', {
+        id: 'E' + acak_(8), kegiatanId: k.id, hadirId: row.id, kategori: d.kategori,
+        a1: ev.a[0], a2: ev.a[1], a3: ev.a[2], a4: ev.a[3], a5: ev.a[4],
+        narasumber: JSON.stringify((ev.n || []).map(Number)), saran: bersih_(ev.s, 1000), waktu: row.waktu
+      });
+    }
     if (d.kategori === 'Mahasiswa' && req.email && emailValid_(email)) ingatEmail_(d.nim, email);
+    if (d.kategori === 'Dosen/PLP/Tendik' && d.nipNik && req.email && emailValid_(email)) ingatEmail_(d.nipNik, email);
     return { dobel: false, r: row };
   });
 
@@ -454,7 +600,7 @@ function hadir_(req) {
   var siap = sertifikatSiap_(k);
   var out = {
     ok: true, dobel: hasil.dobel, nama: r.nama, waktu: r.waktu, kegiatan: k.nama,
-    modeSertifikat: mode, sertifikatSiap: siap,
+    modeSertifikat: mode, sertifikatSiap: siap, jumlahMateri: berkas_(k.id, 'materi').length,
     unduh: siap ? { p: r.id, c: r.kode } : null
   };
   if (hasil.dobel) {
@@ -519,14 +665,16 @@ function bukaUntukMhs_(mhs) {
 }
 
 function saya_(mhs) {
-  var keg = {};
+  var keg = {}, jumlahMateri = {};
   rows_('Kegiatan').forEach(function (k) { if (k.status !== 'dihapus') keg[k.id] = k; });
+  rows_('Berkas').forEach(function (b) { if (b.jenis === 'materi') jumlahMateri[b.kegiatanId] = (jumlahMateri[b.kegiatanId] || 0) + 1; });
   var riwayat = rows_('Kehadiran').filter(function (r) { return normNim_(r.nim) === normNim_(mhs.nim) && keg[r.kegiatanId]; })
     .map(function (r) {
       var k = keg[r.kegiatanId], siap = sertifikatSiap_(k);
       return {
         kegiatanId: k.id, kegiatan: k.nama, jenis: k.jenis, tanggal: k.tanggal, waktuHadir: r.waktu,
-        modeSertifikat: k.modeSertifikat || 'tanpa', sertifikatSiap: siap, unduh: siap ? { p: r.id, c: r.kode } : null
+        modeSertifikat: k.modeSertifikat || 'tanpa', sertifikatSiap: siap, unduh: siap ? { p: r.id, c: r.kode } : null,
+        jumlahMateri: jumlahMateri[k.id] || 0
       };
     });
   riwayat.sort(function (a, b) { return a.waktuHadir < b.waktuHadir ? 1 : -1; });
@@ -541,13 +689,13 @@ function adminInit_(u) {
     var o = infoPublik_(k);
     o.statusAbsen = k.statusAbsen || 'otomatis';
     o.templatNama = k.templatNama; o.templatHalaman = Number(k.templatHalaman || 1); o.templatTotal = Number(k.templatTotal || 0);
-    o.posisi = posisi_(k); o.sertifikatDibuka = k.sertifikatDibuka === 'YA';
+    o.posisi = posisi_(k); o.sertifikatDibuka = k.sertifikatDibuka === 'YA'; o.kodeHadir = k.kodeHadir || '';
     o.jumlah = jumlah[k.id] || 0; o.dibuatOleh = k.dibuatOleh; o.dibuatPada = k.dibuatPada;
     return o;
   });
   keg.sort(function (a, b) { return (a.tanggal + a.id) < (b.tanggal + b.id) ? 1 : -1; });
   var out = { ok: true, user: u, kegiatan: keg, labelSasaran: SASARAN, pengaturan: pengaturan_(), kuotaEmail: MailApp.getRemainingDailyQuota() };
-  if (u.peran === 'superadmin') out.admin = daftarAdmin_();
+  if (u.peran === 'superadmin') { out.admin = daftarAdmin_(); out.gambar = gambarPengesah_(); }
   return out;
 }
 
@@ -558,7 +706,9 @@ function simpanKegiatan_(u, req) {
     tempat: bersih_(d.tempat, 200), narasumber: bersih_(d.narasumber, 300), penyelenggara: bersih_(d.penyelenggara, 150),
     sasaran: (d.sasaran || []).filter(function (s) { return SASARAN[s]; }).join(','),
     bukaAbsen: bersih_(d.bukaAbsen, 16), tutupAbsen: bersih_(d.tutupAbsen, 16),
-    modeSertifikat: ['tanpa', 'langsung', 'setelah'].indexOf(d.modeSertifikat) >= 0 ? d.modeSertifikat : 'tanpa'
+    modeSertifikat: ['tanpa', 'langsung', 'setelah'].indexOf(d.modeSertifikat) >= 0 ? d.modeSertifikat : 'tanpa',
+    wajibKode: d.wajibKode ? 'YA' : 'TIDAK',
+    evaluasi: d.evaluasi ? 'YA' : 'TIDAK'
   };
   if (o.nama.length < 3) return { ok: false, pesan: 'Nama kegiatan wajib diisi.' };
   if (!/^\d{4}-\d{2}-\d{2}$/.test(o.tanggal)) return { ok: false, pesan: 'Tanggal kegiatan wajib diisi.' };
@@ -571,12 +721,14 @@ function simpanKegiatan_(u, req) {
       var k = kegiatan_(d.id);
       if (!k) return { ok: false, pesan: 'Kegiatan tidak ditemukan.' };
       Object.keys(o).forEach(function (x) { k[x] = o[x]; });
+      if (k.wajibKode === 'YA' && !k.kodeHadir) k.kodeHadir = kodeBaru_();
       k.diubahOleh = u.nama; k.diubahPada = now;
       ubah_('Kegiatan', k._row, k);
       log_(u.nama, 'ubah kegiatan', k.id + ' ' + k.nama);
       return { ok: true, id: k.id };
     }
     o.id = 'K' + Utilities.formatDate(new Date(), CONFIG.ZONA, 'yyMMdd') + acak_(4);
+    o.kodeHadir = kodeBaru_();
     o.statusAbsen = 'otomatis'; o.status = 'aktif'; o.sertifikatDibuka = 'TIDAK'; o.templatHalaman = '1';
     o.dibuatOleh = u.nama; o.dibuatPada = now;
     tambah_('Kegiatan', o);
@@ -594,6 +746,23 @@ function hapusKegiatan_(u, req) {
     ubah_('Kegiatan', k._row, k);
     log_(u.nama, 'hapus kegiatan', k.id + ' ' + k.nama);
     return { ok: true };
+  });
+}
+
+function kodeBaru_() {
+  return String(Math.floor(1000 + Math.random() * 9000));
+}
+
+function gantiKode_(u, req) {
+  return kunci_(function () {
+    var k = kegiatan_(req.k);
+    if (!k) return { ok: false, pesan: 'Kegiatan tidak ditemukan.' };
+    var lama = k.kodeHadir;
+    do { k.kodeHadir = kodeBaru_(); } while (k.kodeHadir === lama);
+    k.diubahOleh = u.nama; k.diubahPada = sekarang_('yyyy-MM-dd HH:mm');
+    ubah_('Kegiatan', k._row, k);
+    log_(u.nama, 'ganti kode kehadiran', k.id);
+    return { ok: true, kodeHadir: k.kodeHadir };
   });
 }
 
@@ -671,7 +840,9 @@ function peserta_(req) {
     list.forEach(function (o) { o.ttd = ttd[o.id] || ''; });
   }
   list.sort(function (a, b) { return a.waktu < b.waktu ? -1 : 1; });
-  return { ok: true, kegiatan: infoPublik_(k), peserta: list, pengaturan: pengaturan_() };
+  var out = { ok: true, kegiatan: infoPublik_(k), peserta: list, pengaturan: pengaturan_() };
+  if (req.denganTtd) out.gambar = gambarPengesah_();
+  return out;
 }
 
 function ubahPeserta_(u, req) {
@@ -800,6 +971,201 @@ function simpanPengaturan_(u, req) {
     });
     log_(u.nama, 'ubah pengaturan', JSON.stringify(d));
     return { ok: true, pengaturan: pengaturan_() };
+  });
+}
+
+/* ===================== KODE, EVALUASI, LAPORAN, BERKAS ===================== */
+/** "1. A 2. B" / baris baru / titik koma → ['A', 'B'] */
+function daftarNarasumber_(t) {
+  var s = String(t || '').replace(/\r/g, '').trim();
+  if (!s) return [];
+  var bagian = /\n/.test(s) ? s.split('\n') : s.split(/\s+(?=\d{1,2}[.)]\s)|;\s*/);
+  return bagian.map(function (x) { return x.replace(/^\s*\d{1,2}[.)]\s*/, '').trim(); }).filter(Boolean);
+}
+
+function periksaKode_(k, kode, pengenal) {
+  var id = normId_(pengenal || '').slice(0, 40) || 'anon';
+  var ck = CacheService.getScriptCache(), kunciSalah = 'salah_' + k.id + '_' + id;
+  var salah = Number(ck.get(kunciSalah) || 0);
+  if (salah >= 5) return { ok: false, kode: 'KODE', pesan: 'Terlalu banyak kode salah. Coba lagi 10 menit lagi atau hubungi panitia.' };
+  if (String(kode || '').replace(/\D/g, '') !== String(k.kodeHadir || '')) {
+    ck.put(kunciSalah, String(salah + 1), 600);
+    return { ok: false, kode: 'KODE', pesan: 'Kode kehadiran salah. Kode diumumkan panitia di ruangan atau di layar Zoom.' };
+  }
+  return { ok: true };
+}
+
+/** Cek kode sebelum evaluasi dibuka (publik). */
+function cekKode_(req) {
+  var k = kegiatan_(req.k);
+  if (!k) return { ok: false, pesan: 'Kegiatan tidak ditemukan.' };
+  if (k.wajibKode !== 'YA') return { ok: true };
+  if (statusAbsen_(k) !== 'buka') return { ok: false, pesan: 'Daftar hadir sedang tidak dibuka.' };
+  return periksaKode_(k, req.kode, req.perangkat);
+}
+
+function folderBerkas_(k) {
+  var props = PropertiesService.getScriptProperties();
+  var akarId = props.getProperty('FOLDER_BERKAS_ID'), akar;
+  if (akarId) { try { akar = DriveApp.getFolderById(akarId); } catch (e) { akar = null; } }
+  if (!akar) { akar = DriveApp.createFolder('Daftar Hadir Kegiatan - Berkas'); props.setProperty('FOLDER_BERKAS_ID', akar.getId()); }
+  var nama = k.id + ' - ' + String(k.nama).slice(0, 80);
+  var it = akar.getFoldersByName(nama);
+  return it.hasNext() ? it.next() : akar.createFolder(nama);
+}
+
+function berkas_(kid, jenis) {
+  return rows_('Berkas').filter(function (b) { return b.kegiatanId === kid && (!jenis || b.jenis === jenis); })
+    .sort(function (a, b) { return (Number(a.urutan) || 0) - (Number(b.urutan) || 0) || (a.waktu < b.waktu ? -1 : 1); })
+    .map(function (b) { return { id: b.id, jenis: b.jenis, nama: b.nama, mime: b.mime, ukuran: Number(b.ukuran) || 0, narasumber: b.narasumber, urutan: Number(b.urutan) || 0, waktu: b.waktu }; });
+}
+
+function unggahBerkas_(u, req) {
+  var k = kegiatan_(req.k);
+  if (!k) return { ok: false, pesan: 'Kegiatan tidak ditemukan.' };
+  var jenis = req.jenis === 'materi' ? 'materi' : 'foto';
+  var bytes = Utilities.base64Decode(String(req.data || ''));
+  if (!bytes.length) return { ok: false, pesan: 'File kosong.' };
+  if (bytes.length > MAKS_BERKAS) return { ok: false, pesan: 'File terlalu besar (maks. 20 MB).' };
+  var mime = bersih_(req.mime, 120) || 'application/octet-stream';
+  var nama = bersih_(req.nama, 150) || (jenis === 'foto' ? 'foto.jpg' : 'materi');
+  var file = folderBerkas_(k).createFile(Utilities.newBlob(bytes, mime, nama));
+  return kunci_(function () {
+    var urutan = berkas_(k.id, jenis).length + 1;
+    var row = { id: 'B' + acak_(8), kegiatanId: k.id, jenis: jenis, nama: nama, fileId: file.getId(), mime: mime, ukuran: bytes.length,
+      narasumber: bersih_(req.narasumber, 200), urutan: urutan, diunggahOleh: u.nama, waktu: sekarang_('yyyy-MM-dd HH:mm:ss') };
+    tambah_('Berkas', row);
+    log_(u.nama, 'unggah ' + jenis, k.id + ' ' + nama);
+    return { ok: true, berkas: berkas_(k.id) };
+  });
+}
+
+function hapusBerkas_(u, req) {
+  return kunci_(function () {
+    var b = rows_('Berkas').filter(function (x) { return x.id === String(req.id); })[0];
+    if (!b) return { ok: false, pesan: 'Berkas tidak ditemukan.' };
+    try { DriveApp.getFileById(b.fileId).setTrashed(true); } catch (e) { }
+    sh_('Berkas').deleteRow(b._row);
+    log_(u.nama, 'hapus ' + b.jenis, b.kegiatanId + ' ' + b.nama);
+    return { ok: true, berkas: berkas_(b.kegiatanId) };
+  });
+}
+
+function urutBerkas_(u, req) {
+  return kunci_(function () {
+    var ids = (req.ids || []).map(String);
+    rows_('Berkas').forEach(function (b) {
+      var i = ids.indexOf(b.id);
+      if (i >= 0 && Number(b.urutan) !== i + 1) { b.urutan = i + 1; ubah_('Berkas', b._row, b); }
+    });
+    return { ok: true, berkas: berkas_(String(req.k)) };
+  });
+}
+
+function ambilBerkas_(req) {
+  var b = rows_('Berkas').filter(function (x) { return x.id === String(req.id); })[0];
+  if (!b) return { ok: false, pesan: 'Berkas tidak ditemukan.' };
+  return { ok: true, id: b.id, nama: b.nama, mime: b.mime, data: Utilities.base64Encode(DriveApp.getFileById(b.fileId).getBlob().getBytes()) };
+}
+
+/** Materi narasumber untuk peserta (publik). */
+function materiPublik_(req) {
+  var k = kegiatan_(req.k);
+  if (!k) return { ok: false, pesan: 'Kegiatan tidak ditemukan.' };
+  return { ok: true, kegiatan: { id: k.id, nama: k.nama, tanggal: k.tanggal }, materi: berkas_(k.id, 'materi') };
+}
+
+function unduhMateri_(req) {
+  var b = rows_('Berkas').filter(function (x) { return x.id === String(req.id) && x.kegiatanId === String(req.k) && x.jenis === 'materi'; })[0];
+  if (!b) return { ok: false, pesan: 'Materi tidak ditemukan.' };
+  return { ok: true, nama: b.nama, mime: b.mime, data: Utilities.base64Encode(DriveApp.getFileById(b.fileId).getBlob().getBytes()) };
+}
+
+function laporanRow_(kid) {
+  return rows_('Laporan').filter(function (r) { return r.kegiatanId === kid; })[0] || null;
+}
+
+function ambilLaporan_(req) {
+  var k = kegiatan_(req.k);
+  if (!k) return { ok: false, pesan: 'Kegiatan tidak ditemukan.' };
+  var r = laporanRow_(k.id), data = {};
+  if (r) { try { data = JSON.parse(r.data || '{}'); } catch (e) { data = {}; } }
+  var peserta = rows_('Kehadiran').filter(function (x) { return x.kegiatanId === k.id; })
+    .map(function (x) { return { nama: x.nama, kategori: x.kategori, prodi: x.prodi, instansi: x.instansi, nim: x.nim, nipNik: x.nipNik }; });
+  var opsi = { ok: true, laporan: data, diubahPada: r ? r.diubahPada : '', diubahOleh: r ? r.diubahOleh : '',
+    berkas: berkas_(k.id), peserta: peserta, narasumber: daftarNarasumber_(k.narasumber),
+    evaluasi: evaluasiKegiatan_(k.id), aspek: ASPEK_EVALUASI };
+  if (req.denganNama) {
+    var st = staf_(), mh = mahasiswa_();
+    opsi.namaStaf = Object.keys(st).map(function (x) { return st[x].nama; });
+    opsi.namaMhs = Object.keys(mh).map(function (x) { return mh[x].nama + ' — ' + mh[x].nim; });
+  }
+  return opsi;
+}
+
+function simpanLaporan_(u, req) {
+  var teks = JSON.stringify(req.data || {});
+  if (teks.length > 49000) return { ok: false, pesan: 'Isi notulen terlalu panjang untuk disimpan (maks. ±45.000 karakter). Ringkas beberapa bagian.' };
+  return kunci_(function () {
+    var k = kegiatan_(req.k);
+    if (!k) return { ok: false, pesan: 'Kegiatan tidak ditemukan.' };
+    var r = laporanRow_(k.id), now = sekarang_('yyyy-MM-dd HH:mm');
+    var o = { kegiatanId: k.id, data: teks, diubahOleh: u.nama, diubahPada: now };
+    if (r) ubah_('Laporan', r._row, o); else tambah_('Laporan', o);
+    return { ok: true, diubahPada: now };
+  });
+}
+
+function evaluasiKegiatan_(kid) {
+  return rows_('Evaluasi').filter(function (e) { return e.kegiatanId === kid; }).map(function (e) {
+    var n = []; try { n = JSON.parse(e.narasumber || '[]'); } catch (x) { }
+    return { kategori: e.kategori, a: [e.a1, e.a2, e.a3, e.a4, e.a5].map(Number), n: n.map(Number), saran: e.saran };
+  });
+}
+
+/** Semua bahan laporan (admin). Foto diambil terpisah lewat ambilBerkas. */
+function dataLaporan_(req) {
+  var p = peserta_({ k: req.k, denganTtd: true });
+  if (!p.ok) return p;
+  var l = ambilLaporan_({ k: req.k });
+  p.laporan = l.laporan; p.berkas = l.berkas; p.narasumber = l.narasumber;
+  p.evaluasi = evaluasiKegiatan_(String(req.k));
+  p.aspek = ASPEK_EVALUASI;
+  var k = kegiatan_(req.k);
+  p.sertifikat = { mode: k.modeSertifikat || 'tanpa', dibuka: k.sertifikatDibuka === 'YA', adaTemplat: !!k.templatId };
+  return p;
+}
+
+/** Gambar tanda tangan & stempel pengesah (data URL) atau kosong. */
+function gambarPengesah_() {
+  var pg = pengaturan_(), out = {};
+  ['ttd', 'stempel'].forEach(function (j) {
+    var id = pg[j + '_file'];
+    if (!id) return;
+    try { out[j] = 'data:image/png;base64,' + Utilities.base64Encode(DriveApp.getFileById(id).getBlob().getBytes()); } catch (e) { }
+  });
+  return out;
+}
+
+function gambarPengesahan_(u, req) {
+  if (u.peran !== 'superadmin') return { ok: false, pesan: 'Hanya super admin yang dapat mengubah tanda tangan & stempel.' };
+  var jenis = req.jenis === 'stempel' ? 'stempel' : 'ttd';
+  return kunci_(function () {
+    var ada = rows_('Pengaturan'), kunciP = jenis + '_file';
+    var r = ada.filter(function (x) { return x.kunci === kunciP; })[0];
+    var lama = r ? r.nilai : '';
+    var baru = '';
+    if (req.data) {
+      var bytes = Utilities.base64Decode(String(req.data).replace(/^data:image\/\w+;base64,/, ''));
+      if (bytes.length > 3 * 1024 * 1024) return { ok: false, pesan: 'Gambar terlalu besar (maks. 3 MB).' };
+      var folder = DriveApp.getFolderById(PropertiesService.getScriptProperties().getProperty('FOLDER_ID'));
+      baru = folder.createFile(Utilities.newBlob(bytes, 'image/png', (jenis === 'ttd' ? 'Tanda tangan' : 'Stempel') + ' pengesah.png')).getId();
+    }
+    if (lama) { try { DriveApp.getFileById(lama).setTrashed(true); } catch (e) { } }
+    if (r) { r.nilai = baru; ubah_('Pengaturan', r._row, r); }
+    else tambah_('Pengaturan', { kunci: kunciP, nilai: baru, keterangan: '' });
+    log_(u.nama, (baru ? 'unggah ' : 'hapus ') + jenis + ' pengesah', '');
+    return { ok: true, gambar: gambarPengesah_() };
   });
 }
 

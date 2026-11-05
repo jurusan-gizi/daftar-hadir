@@ -59,7 +59,8 @@
         var aksi = r.sertifikatSiap && r.unduh ? '<a class="tbl kecil" href="' + H.linkSertifikat(r.kegiatanId, r.unduh) + '">📄 Sertifikat</a>' :
           r.modeSertifikat === 'tanpa' ? '<span class="kecil">Tanpa sertifikat</span>' : '<span class="lbl belum">Sertifikat belum terbit</span>';
         return '<tr><td><b>' + esc(r.kegiatan) + '</b><br><span class="kecil">' + esc(r.jenis || '') + ' · ' + esc(H.tglPanjang(r.tanggal)) + '</span></td>' +
-          '<td class="kecil">' + esc(r.waktuHadir) + '</td><td class="aksi">' + aksi + '</td></tr>';
+          '<td class="kecil">' + esc(r.waktuHadir) + '</td><td class="aksi">' + aksi +
+          (r.jumlahMateri ? ' <a class="tbl garis kecil" href="materi.html?k=' + encodeURIComponent(r.kegiatanId) + '">📚 Materi</a>' : '') + '</td></tr>';
       }).join('');
       isi.innerHTML =
         '<section class="pita"><h1>Halo, ' + esc(d.profil.nama) + '</h1><p>' + esc(d.profil.nim) + ' · ' + esc(d.profil.prodi) + '</p></section>' +
@@ -182,7 +183,9 @@
       '<p class="kecil" style="margin:0 0 16px">PDF sertifikat dari SRIKANDI diunggah di tab <b>Sertifikat</b> setelah kegiatan disimpan.</p>' +
       '<label class="f"><span>Pengamanan</span></label>' +
       '<div class="pilihan" style="margin-bottom:4px"><label><input type="checkbox" id="f-kode"' + (baru || k.wajibKode ? ' checked' : '') + '> 🔐 Wajib kode kehadiran</label></div>' +
-      '<p class="kecil" style="margin:0 0 16px">Kode 4 angka diumumkan panitia di ruangan / layar Zoom. Orang yang hanya menerima link tanpa hadir tidak dapat mengisi.</p>' +
+      '<p class="kecil" style="margin:0 0 10px">Kode 4 angka diumumkan panitia di ruangan / layar Zoom. Orang yang hanya menerima link tanpa hadir tidak dapat mengisi.</p>' +
+      '<div class="pilihan" style="margin-bottom:4px"><label><input type="checkbox" id="f-eval"' + (baru || k.evaluasi ? ' checked' : '') + '> ⭐ Evaluasi kepuasan peserta</label></div>' +
+      '<p class="kecil" style="margin:0 0 16px">5 aspek + nilai per narasumber (bintang 1–5), wajib diisi peserta setelah kode kehadiran benar. Hasilnya masuk otomatis ke laporan.</p>' +
       '<button class="tbl penuh" id="f-simpan" type="submit">' + (baru ? 'Simpan & Lanjut' : 'Simpan Perubahan') + '</button>' +
       '</form>';
 
@@ -201,7 +204,7 @@
         sasaran: [].map.call(document.querySelectorAll('#f-sasaran input:checked'), function (x) { return x.value; }),
         bukaAbsen: $('f-buka').value, tutupAbsen: $('f-tutup').value,
         modeSertifikat: (document.querySelector('#f-mode input:checked') || {}).value || 'tanpa',
-        wajibKode: $('f-kode').checked
+        wajibKode: $('f-kode').checked, evaluasi: $('f-eval').checked
       };
       if (data.nama.trim().length < 3) return H.toast('Nama kegiatan wajib diisi.', true);
       if (!data.tanggal) return H.toast('Tanggal kegiatan wajib diisi.', true);
@@ -220,7 +223,8 @@
 
   /* ---------- Detail kegiatan ---------- */
   function detail(k, tab) {
-    var tabs = [['bagikan', '🔗 Bagikan'], ['peserta', '👥 Peserta'], ['sertifikat', '📄 Sertifikat'], ['rekap', '🖨️ Rekap']];
+    var tabs = [['bagikan', '🔗 Bagikan'], ['peserta', '👥 Peserta'], ['notulensi', '📝 Notulensi'], ['dokumentasi', '📷 Dokumentasi'], ['materi', '📚 Materi'],
+      ['evaluasi', '⭐ Evaluasi'], ['sertifikat', '📄 Sertifikat'], ['rekap', '📑 Rekap & Laporan']];
     isi.innerHTML =
       '<div class="baris antara" style="margin-bottom:12px"><a class="tbl garis kecil" href="#/">← Semua kegiatan</a>' +
       '<div class="baris"><a class="tbl garis kecil" href="#/edit/' + esc(k.id) + '">✏️ Ubah</a>' +
@@ -266,7 +270,8 @@
       await segarkan(); H.toast('Kegiatan dihapus.'); location.hash = '#/';
     };
 
-    ({ bagikan: tabBagikan, peserta: tabPeserta, sertifikat: tabSertifikat, rekap: tabRekap }[tab] || tabBagikan)(k);
+    ({ bagikan: tabBagikan, peserta: tabPeserta, notulensi: tabNotulensi, dokumentasi: tabDokumentasi, materi: tabMateri, evaluasi: tabEvaluasi,
+      sertifikat: tabSertifikat, rekap: tabRekap }[tab] || tabBagikan)(k);
   }
 
   /** Kode kehadiran ukuran besar untuk ditayangkan di proyektor / share screen Zoom. */
@@ -646,6 +651,10 @@
   function tabRekap(k) {
     var serti = k.modeSertifikat !== 'tanpa' && k.adaTemplat;
     $('isi-tab').innerHTML =
+      '<div class="kartu" style="border-top:4px solid var(--lime)"><h3>📑 Laporan Kegiatan</h3><p class="sub">Sampul, lembar pengesahan (tanda tangan & stempel), BAB I–IV dari notulensi & evaluasi, ' +
+      'lampiran daftar hadir, dokumentasi foto, materi, dan contoh sertifikat. Huruf Cambria 12 pt.</p>' +
+      '<div class="baris"><button class="tbl" id="lap-word">⬇️ Unduh Word (.docx)</button><a class="tbl garis" target="_blank" href="laporan.html?k=' + encodeURIComponent(k.id) + '">🖨️ Versi Cetak / PDF</a>' +
+      '<span class="kecil" id="lap-status"></span></div></div>' +
       '<div class="grid2">' +
       '<div class="kartu"><h3>🖨️ Daftar hadir resmi</h3><p class="sub">Kop Jurusan Gizi, tabel peserta dengan tanda tangan, dan pengesahan Ketua Jurusan. Simpan sebagai PDF lewat menu cetak.</p>' +
       '<a class="tbl penuh" target="_blank" href="rekap.html?k=' + encodeURIComponent(k.id) + '">Buka & Cetak Daftar Hadir</a></div>' +
@@ -654,6 +663,18 @@
       (serti ? '<div class="kartu"><h3>📄 Semua sertifikat</h3><p class="sub">Satu file PDF berisi sertifikat seluruh peserta (1 halaman per orang), siap dicetak.</p>' +
         '<button class="tbl garis penuh" id="semua">Unduh Semua Sertifikat (PDF)</button></div>' : '') +
       '</div>';
+    $('lap-word').onclick = async function () {
+      var b = this; b.disabled = true;
+      try {
+        if (!window.docx) { $('lap-status').textContent = 'Memuat modul Word…'; await muatSkrip('vendor/docx.iife.js'); }
+        var bahan = await Laporan.siapkan(k.id, function (t) { $('lap-status').textContent = t; });
+        $('lap-status').textContent = 'Menyusun dokumen Word…';
+        var blob = await Laporan.keDocx(Laporan.model(bahan), 'Laporan ' + k.nama);
+        H.unduhBytes(blob, 'Laporan Kegiatan - ' + H.namaFile(k.nama) + '.docx', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
+        $('lap-status').textContent = '✔ Laporan terunduh.';
+      } catch (e) { $('lap-status').textContent = ''; H.toast(e.message, true); }
+      finally { b.disabled = false; }
+    };
     $('excel').onclick = async function () {
       var b = this; b.disabled = true;
       try {
@@ -702,6 +723,15 @@
       '<label class="f"><span>Kota (tanggal pengesahan)</span><input type="text" id="s-kota" value="' + esc(p.kota || '') + '"></label>' +
       '<label class="f"><span>Nama unit pada kop</span><input type="text" id="s-unit" value="' + esc(p.unit || '') + '"></label>' +
       '</div><button class="tbl" type="submit">Simpan Pengaturan</button></form>' +
+      '<div class="kartu"><h3>✍️ Tanda tangan & stempel pengesah</h3><p class="sub">Otomatis tampil di halaman terakhir daftar hadir dan lembar pengesahan laporan. Unggah foto/scan di kertas putih — latar putih dibuang otomatis.</p>' +
+      '<div class="grid2">' + ['ttd', 'stempel'].map(function (j) {
+        var g = (DATA.gambar || {})[j];
+        return '<div class="blok-not"><h4>' + (j === 'ttd' ? 'Tanda tangan' : 'Stempel / cap') + '</h4>' +
+          '<div style="height:120px;display:flex;align-items:center;justify-content:center;background:repeating-conic-gradient(#F1F5F9 0 25%,#fff 0 50%) 0 0/16px 16px;border-radius:8px;margin-bottom:8px">' +
+          (g ? '<img src="' + g + '" style="max-height:110px;max-width:100%">' : '<span class="kecil">Belum diunggah</span>') + '</div>' +
+          '<div class="baris"><label class="tbl lembut kecil">⬆️ Unggah<input type="file" accept="image/*" hidden data-gambar="' + j + '"></label>' +
+          (g ? '<button class="tbl bahaya kecil" data-hapus-gambar="' + j + '">Hapus</button>' : '') + '</div></div>';
+      }).join('') + '</div></div>' +
       '<div class="kartu"><h3>Admin Daftar Hadir</h3><p class="sub">Diatur dari kolom <b>Daftar Hadir</b> di sheet <b>Staf</b> portal Gizi-Link (isi <code>superadmin</code> atau <code>admin</code>). Perubahan berlaku ±5 menit.</p>' +
       (adm ? '<div class="tabel-wrap"><table class="tabel"><thead><tr><th>Nama</th><th>NIP</th><th>Peran</th></tr></thead><tbody>' + adm + '</tbody></table></div>' : '<p class="kecil">Belum ada.</p>') + '</div>';
     $('fp').onsubmit = async function (e) {
@@ -710,6 +740,409 @@
       if (!r.ok) return H.toast(r.pesan, true);
       DATA.pengaturan = r.pengaturan; H.toast('Pengaturan tersimpan.');
     };
+    document.querySelectorAll('[data-gambar]').forEach(function (inp) {
+      inp.onchange = async function () {
+        var f = this.files[0]; if (!f) return;
+        try {
+          H.toast('Memproses gambar…');
+          var data = await gambarTransparan(f);
+          var r = await H.api('gambarPengesahan', { jenis: inp.dataset.gambar, data: data });
+          if (!r.ok) return H.toast(r.pesan, true);
+          DATA.gambar = r.gambar; H.toast('Gambar tersimpan.'); pengaturan();
+        } catch (e) { H.toast(e.message, true); }
+      };
+    });
+    document.querySelectorAll('[data-hapus-gambar]').forEach(function (b) {
+      b.onclick = async function () {
+        if (!await H.konfirmasi('Hapus gambar?', 'Gambar ini tidak akan tampil lagi di daftar hadir dan laporan.', 'Hapus', true)) return;
+        var r = await H.api('gambarPengesahan', { jenis: b.dataset.hapusGambar, data: '' });
+        if (!r.ok) return H.toast(r.pesan, true);
+        DATA.gambar = r.gambar; pengaturan();
+      };
+    });
+  }
+
+  /** Buang latar putih/abu terang, pangkas tepi kosong, lebar maks. 900 px → data URL PNG. */
+  function gambarTransparan(file) {
+    return new Promise(function (res, rej) {
+      var url = URL.createObjectURL(file), im = new Image();
+      im.onload = function () {
+        var s = Math.min(1, 900 / Math.max(im.width, im.height));
+        var c = document.createElement('canvas'); c.width = Math.round(im.width * s); c.height = Math.round(im.height * s);
+        var x = c.getContext('2d'); x.drawImage(im, 0, 0, c.width, c.height);
+        var d = x.getImageData(0, 0, c.width, c.height), p = d.data;
+        var minX = c.width, minY = c.height, maxX = 0, maxY = 0;
+        for (var i = 0; i < p.length; i += 4) {
+          var terang = (p[i] + p[i + 1] + p[i + 2]) / 3, jenuh = Math.max(p[i], p[i + 1], p[i + 2]) - Math.min(p[i], p[i + 1], p[i + 2]);
+          if (terang > 215 && jenuh < 40) p[i + 3] = 0;
+          else if (terang > 175 && jenuh < 40) p[i + 3] = Math.round(p[i + 3] * (215 - terang) / 40);
+          if (p[i + 3] > 20) { var px = (i / 4) % c.width, py = Math.floor(i / 4 / c.width); if (px < minX) minX = px; if (px > maxX) maxX = px; if (py < minY) minY = py; if (py > maxY) maxY = py; }
+        }
+        x.putImageData(d, 0, 0);
+        URL.revokeObjectURL(url);
+        if (maxX <= minX) return rej(new Error('Gambar tampak kosong. Pastikan tanda tangan/stempel terlihat jelas.'));
+        var pad = 6, w2 = maxX - minX + pad * 2, h2 = maxY - minY + pad * 2;
+        var o = document.createElement('canvas'); o.width = w2; o.height = h2;
+        o.getContext('2d').drawImage(c, minX - pad, minY - pad, w2, h2, 0, 0, w2, h2);
+        res(o.toDataURL('image/png'));
+      };
+      im.onerror = function () { URL.revokeObjectURL(url); rej(new Error('File bukan gambar.')); };
+      im.src = url;
+    });
+  }
+
+  function muatSkrip(src) {
+    return new Promise(function (res, rej) { var s = document.createElement('script'); s.src = src; s.onload = res; s.onerror = function () { rej(new Error('Gagal memuat ' + src)); }; document.head.appendChild(s); });
+  }
+
+  /* =================== NOTULENSI =================== */
+  var LAP = {};
+  async function muatLaporan(k, denganNama) {
+    var d = await H.api('ambilLaporan', { k: k.id, denganNama: !!denganNama });
+    if (!d.ok) throw new Error(d.pesan);
+    LAP[k.id] = d;
+    return d;
+  }
+
+  async function tabNotulensi(k) {
+    var wadah = $('isi-tab');
+    wadah.innerHTML = '<div class="muat"><span class="putar"></span> Memuat notulensi…</div>';
+    var d;
+    try { d = await muatLaporan(k, true); } catch (e) { wadah.innerHTML = '<div class="pesan galat">' + esc(e.message) + '</div>'; return; }
+    var L = JSON.parse(JSON.stringify(d.laporan || {}));
+    var draf = null;
+    try { draf = JSON.parse(localStorage.getItem('notulen_' + k.id) || 'null'); } catch (e) { }
+    if (draf && draf.t > Date.parse(String(d.diubahPada || '').replace(' ', 'T') + ':00+08:00') + 1000) { L = draf.data; setTimeout(function () { H.toast('Draf notulen yang belum tersimpan dipulihkan.'); }, 300); }
+    var baku = Laporan.teksBaku(k);
+    var nara = d.narasumber.length ? d.narasumber : [];
+    L.materi = L.materi || [];
+    nara.forEach(function (n) { if (!L.materi.some(function (m) { return m.narasumber === n; })) L.materi.push({ narasumber: n, judul: '', poin: '' }); });
+    if (!L.materi.length) L.materi.push({ narasumber: '', judul: '', poin: '' });
+    L.diskusi = L.diskusi || [];
+    L.rtl = L.rtl || [];
+
+    var namaPeserta = d.peserta.map(function (p) { return p.nama; });
+    var semuaNama = Array.from(new Set(namaPeserta.concat(d.namaStaf || [], d.namaMhs || [])));
+    var namaJawab = Array.from(new Set(nara.concat(d.namaStaf || [])));
+
+    wadah.innerHTML =
+      '<datalist id="dl-penanya">' + semuaNama.map(function (n) { return '<option value="' + esc(n) + '">'; }).join('') + '</datalist>' +
+      '<datalist id="dl-penjawab">' + namaJawab.map(function (n) { return '<option value="' + esc(n) + '">'; }).join('') + '</datalist>' +
+      '<div class="pesan info">💡 Tulis <b>satu poin per baris</b> — tidak perlu nomor, titik, atau huruf kapital; aplikasi merapikan otomatis. Notulen tersimpan otomatis.</div>' +
+      '<div class="kartu"><h3>1. Pendahuluan <span class="kecil" style="font-weight:400">— sudah terisi teks baku, ubah bila perlu</span></h3>' +
+      '<label class="f"><span>Dasar kegiatan (nomor surat/SK/undangan, satu per baris)</span><textarea id="n-dasar" rows="2" spellcheck="true" lang="id" placeholder="' + esc(baku.dasar) + '">' + esc(L.dasar || '') + '</textarea></label>' +
+      '<label class="f"><span>Latar belakang</span><textarea id="n-latar" rows="5" spellcheck="true" lang="id">' + esc(L.latarBelakang || baku.latarBelakang) + '</textarea></label>' +
+      '<label class="f"><span>Tujuan (satu per baris)</span><textarea id="n-tujuan" rows="3" spellcheck="true" lang="id">' + esc(L.tujuan || baku.tujuan) + '</textarea></label></div>' +
+      '<div class="kartu"><h3>2. Pokok materi per narasumber</h3><div id="n-materi"></div>' +
+      (nara.length ? '' : '<button type="button" class="tbl lembut kecil" id="n-tambah-materi">＋ Tambah narasumber/materi</button>') + '</div>' +
+      '<div class="kartu"><div class="baris antara"><h3 style="margin:0">3. Diskusi / tanya jawab</h3><button type="button" class="tbl garis kecil" id="n-cocok">🔎 Cocokkan nama dengan daftar hadir</button></div>' +
+      '<p class="sub kecil">Penanya: ketik beberapa huruf lalu pilih saran (dosen, mahasiswa, peserta yang sudah absen), atau ketik bebas.</p>' +
+      '<div id="n-diskusi"></div><button type="button" class="tbl lembut kecil" id="n-tambah-tanya">＋ Tambah pertanyaan</button></div>' +
+      '<div class="kartu"><h3>4. Penutup</h3>' +
+      '<label class="f"><span>Kesimpulan (satu per baris) <button type="button" class="tbl garis kecil" id="n-draf-kes" style="margin-left:6px">✨ Buat draf otomatis</button></span><textarea id="n-kesimpulan" rows="4" spellcheck="true" lang="id">' + esc(L.kesimpulan || '') + '</textarea></label>' +
+      '<label class="f"><span>Kendala (kosongkan bila tidak ada)</span><textarea id="n-kendala" rows="2" spellcheck="true" lang="id" placeholder="Kegiatan berjalan lancar tanpa kendala yang berarti.">' + esc(L.kendala || '') + '</textarea></label>' +
+      '<label class="f"><span>Rekomendasi <button type="button" class="tbl garis kecil" id="n-draf-rek" style="margin-left:6px">✨ Isi dari hasil evaluasi</button></span><textarea id="n-rekomendasi" rows="3" spellcheck="true" lang="id">' + esc(L.rekomendasi || '') + '</textarea></label>' +
+      '<label class="f"><span>Rencana tindak lanjut (opsional)</span></label><div id="n-rtl"></div><button type="button" class="tbl lembut kecil" id="n-tambah-rtl">＋ Tambah RTL</button></div>' +
+      '<div class="bar-simpan"><span class="simpan-status" id="n-status">' + (d.diubahPada ? 'Tersimpan ' + esc(d.diubahPada) + (d.diubahOleh ? ' oleh ' + esc(d.diubahOleh) : '') : 'Belum disimpan') + '</span>' +
+      '<div class="baris"><button type="button" class="tbl garis" id="n-pratinjau">👁️ Pratinjau</button><button type="button" class="tbl" id="n-simpan">💾 Simpan</button></div></div>';
+
+    function gambarMateri() {
+      $('n-materi').innerHTML = L.materi.map(function (m, i) {
+        return '<div class="blok-not" data-i="' + i + '"><h4><span class="no">' + (i + 1) + '</span>' +
+          (nara.length ? esc(m.narasumber) : '<input type="text" data-f="narasumber" placeholder="Nama narasumber" value="' + esc(m.narasumber) + '" style="flex:1">') +
+          (!nara.length && L.materi.length > 1 ? '<button type="button" class="tbl bahaya ikon kecil" data-hapus-materi="' + i + '">✕</button>' : '') + '</h4>' +
+          '<label class="f"><span>Judul materi</span><input type="text" data-f="judul" value="' + esc(m.judul) + '" spellcheck="true" lang="id"></label>' +
+          '<label class="f" style="margin:0"><span>Pokok materi (satu poin per baris)</span><textarea data-f="poin" rows="4" spellcheck="true" lang="id" placeholder="contoh:\nNCP terdiri dari 4 langkah\nasesmen gizi atlet berbeda dengan non-atlet">' + esc(m.poin) + '</textarea></label></div>';
+      }).join('');
+    }
+    function gambarDiskusi() {
+      $('n-diskusi').innerHTML = L.diskusi.length ? L.diskusi.map(function (q, i) {
+        return '<div class="kartu-tanya" data-i="' + i + '"><div class="kepala">Pertanyaan ' + (i + 1) + '<span>' +
+          (i > 0 ? '<button type="button" class="tbl garis ikon kecil" data-naik="' + i + '" title="Naikkan">↑</button> ' : '') +
+          '<button type="button" class="tbl bahaya ikon kecil" data-hapus-tanya="' + i + '" title="Hapus">✕</button></span></div>' +
+          '<div class="grid2"><label class="f"><span>Penanya</span><input type="text" data-f="penanya" list="dl-penanya" value="' + esc(q.penanya) + '" placeholder="ketik nama…"></label>' +
+          '<label class="f"><span>Dijawab oleh</span><input type="text" data-f="penjawab" list="dl-penjawab" value="' + esc(q.penjawab) + '" placeholder="pilih narasumber…"></label></div>' +
+          '<label class="f"><span>Pertanyaan</span><textarea data-f="pertanyaan" rows="2" spellcheck="true" lang="id">' + esc(q.pertanyaan) + '</textarea></label>' +
+          '<label class="f" style="margin:0"><span>Jawaban (satu poin per baris)</span><textarea data-f="jawaban" rows="3" spellcheck="true" lang="id">' + esc(q.jawaban) + '</textarea></label></div>';
+      }).join('') : '<div class="kosong kecil">Belum ada pertanyaan. Tekan <b>＋ Tambah pertanyaan</b> setiap ada penanya.</div>';
+    }
+    function gambarRtl() {
+      $('n-rtl').innerHTML = L.rtl.map(function (r, i) {
+        return '<div class="rtl-baris" data-i="' + i + '"><input type="text" data-f="uraian" placeholder="Uraian tindak lanjut" value="' + esc(r.uraian) + '">' +
+          '<input type="text" data-f="pj" placeholder="Penanggung jawab" list="dl-penjawab" value="' + esc(r.pj) + '"><input type="date" data-f="tenggat" value="' + esc(r.tenggat) + '">' +
+          '<button type="button" class="tbl bahaya ikon kecil" data-hapus-rtl="' + i + '">✕</button></div>';
+      }).join('');
+    }
+    function kumpulkan() {
+      L.dasar = $('n-dasar').value; L.latarBelakang = $('n-latar').value; L.tujuan = $('n-tujuan').value;
+      L.kesimpulan = $('n-kesimpulan').value; L.kendala = $('n-kendala').value; L.rekomendasi = $('n-rekomendasi').value;
+      document.querySelectorAll('#n-materi [data-i]').forEach(function (el) { var m = L.materi[el.dataset.i]; el.querySelectorAll('[data-f]').forEach(function (f) { m[f.dataset.f] = f.value; }); });
+      document.querySelectorAll('#n-diskusi [data-i]').forEach(function (el) { var q = L.diskusi[el.dataset.i]; el.querySelectorAll('[data-f]').forEach(function (f) { q[f.dataset.f] = f.value; }); });
+      document.querySelectorAll('#n-rtl [data-i]').forEach(function (el) { var r = L.rtl[el.dataset.i]; el.querySelectorAll('[data-f]').forEach(function (f) { r[f.dataset.f] = f.value; }); });
+      return L;
+    }
+    gambarMateri(); gambarDiskusi(); gambarRtl();
+
+    var kotor = false, tunda = null;
+    function berubah() {
+      kotor = true; $('n-status').textContent = 'Ada perubahan…';
+      try { localStorage.setItem('notulen_' + k.id, JSON.stringify({ t: Date.now(), data: kumpulkan() })); } catch (e) { }
+      clearTimeout(tunda); tunda = setTimeout(simpan, 4000);
+    }
+    async function simpan(manual) {
+      clearTimeout(tunda);
+      if (!$('n-status')) return;
+      if (!kotor && !manual) return;
+      var data = kumpulkan();
+      data.foto = (LAP[k.id] && LAP[k.id].laporan && LAP[k.id].laporan.foto) || data.foto;
+      $('n-status').textContent = 'Menyimpan…';
+      try {
+        var r = await H.api('simpanLaporan', { k: k.id, data: data });
+        if (!r.ok) { $('n-status').textContent = '⚠️ ' + r.pesan; return; }
+        kotor = false; LAP[k.id].laporan = data; LAP[k.id].diubahPada = r.diubahPada;
+        try { localStorage.removeItem('notulen_' + k.id); } catch (e) { }
+        if ($('n-status')) $('n-status').textContent = '✔ Tersimpan ' + r.diubahPada;
+        if (manual) H.toast('Notulensi tersimpan.');
+      } catch (e) { if ($('n-status')) $('n-status').textContent = '⚠️ Gagal menyimpan — draf aman di perangkat ini. ' + e.message; }
+    }
+    wadah.addEventListener('input', berubah);
+    wadah.addEventListener('click', function (e) {
+      var b = e.target.closest('button'); if (!b) return;
+      kumpulkan();
+      if (b.id === 'n-tambah-tanya') { L.diskusi.push({ penanya: '', pertanyaan: '', penjawab: nara.length === 1 ? nara[0] : '', jawaban: '' }); gambarDiskusi(); var c = document.querySelectorAll('#n-diskusi [data-f="penanya"]'); c[c.length - 1].focus(); berubah(); }
+      else if (b.dataset.hapusTanya != null) { if (L.diskusi[b.dataset.hapusTanya].pertanyaan && !confirm('Hapus pertanyaan ini?')) return; L.diskusi.splice(Number(b.dataset.hapusTanya), 1); gambarDiskusi(); berubah(); }
+      else if (b.dataset.naik != null) { var i = Number(b.dataset.naik); var t = L.diskusi[i]; L.diskusi[i] = L.diskusi[i - 1]; L.diskusi[i - 1] = t; gambarDiskusi(); berubah(); }
+      else if (b.id === 'n-tambah-rtl') { L.rtl.push({ uraian: '', pj: '', tenggat: '' }); gambarRtl(); berubah(); }
+      else if (b.dataset.hapusRtl != null) { L.rtl.splice(Number(b.dataset.hapusRtl), 1); gambarRtl(); berubah(); }
+      else if (b.id === 'n-tambah-materi') { L.materi.push({ narasumber: '', judul: '', poin: '' }); gambarMateri(); berubah(); }
+      else if (b.dataset.hapusMateri != null) { L.materi.splice(Number(b.dataset.hapusMateri), 1); gambarMateri(); berubah(); }
+      else if (b.id === 'n-draf-kes') {
+        var ring = Laporan.ringkasEvaluasi(d.evaluasi, d.aspek, d.narasumber);
+        if ($('n-kesimpulan').value.trim() && !confirm('Ganti isi kesimpulan dengan draf otomatis?')) return;
+        $('n-kesimpulan').value = Laporan.drafKesimpulan(k, d.peserta.length, ring); berubah();
+      } else if (b.id === 'n-draf-rek') {
+        var ring2 = Laporan.ringkasEvaluasi(d.evaluasi, d.aspek, d.narasumber);
+        if ($('n-rekomendasi').value.trim() && !confirm('Ganti isi rekomendasi dengan draf dari hasil evaluasi?')) return;
+        $('n-rekomendasi').value = Laporan.drafRekomendasi(ring2); berubah();
+      } else if (b.id === 'n-simpan') { kotor = true; simpan(true); }
+      else if (b.id === 'n-pratinjau') { pratinjauNotulen(k, kumpulkan(), nara); }
+      else if (b.id === 'n-cocok') { cocokkanNama(namaPeserta); }
+    });
+    function cocokkanNama(daftar) {
+      kumpulkan();
+      var usul = [];
+      L.diskusi.forEach(function (q, i) {
+        var n = String(q.penanya || '').trim();
+        if (!n || daftar.indexOf(n) >= 0) return;
+        var m = cariMirip(n, daftar);
+        if (m) usul.push({ i: i, dari: n, ke: m });
+      });
+      if (!usul.length) return H.toast('Tidak ada nama penanya yang perlu dicocokkan.');
+      H.dialog('Cocokkan nama penanya', '<p class="kecil">Centang nama yang ingin diganti dengan nama resmi dari daftar hadir:</p>' + usul.map(function (u, j) {
+        return '<label class="pilihan" style="margin-bottom:6px;display:block"><label style="display:flex;width:100%"><input type="checkbox" checked data-u="' + j + '"> ' + esc(u.dari) + ' → <b>' + esc(u.ke) + '</b></label></label>';
+      }).join(''), [{ label: 'Batal', kelas: 'garis', nilai: null }, { label: 'Ganti', nilai: function (l) { return [].map.call(l.querySelectorAll('[data-u]:checked'), function (x) { return usul[x.dataset.u]; }); } }])
+        .then(function (pilih) {
+          if (!pilih || !pilih.length) return;
+          pilih.forEach(function (u) { L.diskusi[u.i].penanya = u.ke; });
+          gambarDiskusi(); berubah(); H.toast(pilih.length + ' nama diperbarui.');
+        });
+    }
+    window.addEventListener('beforeunload', function () { if (kotor) simpan(); }, { once: true });
+    var cekRute = function () { if (kotor) simpan(); window.removeEventListener('hashchange', cekRute); };
+    window.addEventListener('hashchange', cekRute);
+  }
+
+  /** Nama paling mirip (abaikan gelar & sapaan). */
+  function cariMirip(n, daftar) {
+    function token(x) {
+      return String(x).toLowerCase().replace(/\(.*?\)/g, ' ').split(',')[0].replace(/\b(ibu|bapak|bpk|pak|bu|sdr|sdri|dr|drs|dra|prof|ir|hj|h|ns|apt)\b\.?/g, ' ')
+        .replace(/[^a-z\s]/g, ' ').split(/\s+/).filter(function (t) { return t.length > 1; });
+    }
+    var a = token(n.split(/[–—-]/)[0]), terbaik = null, skor = 0;
+    if (!a.length) return null;
+    daftar.forEach(function (d) {
+      var b = token(d), cocok = 0;
+      a.forEach(function (t) { if (b.some(function (u) { return u === t || (t.length >= 4 && (u.indexOf(t) === 0 || t.indexOf(u) === 0)); })) cocok++; });
+      var s = cocok / Math.max(a.length, 1);
+      if (s > skor) { skor = s; terbaik = d; }
+    });
+    return skor >= 0.5 ? terbaik : null;
+  }
+
+  function pratinjauNotulen(k, L, nara) {
+    var ol = function (t) { var a = H.rapikanPoin(t); return a.length ? '<ol>' + a.map(function (x) { return '<li>' + esc(x) + '</li>'; }).join('') + '</ol>' : '<p class="kecil">—</p>'; };
+    var ul = function (t) { var a = H.rapikanPoin(t); return a.length ? '<ul>' + a.map(function (x) { return '<li>' + esc(x) + '</li>'; }).join('') + '</ul>' : ''; };
+    var html = '<div class="pratinjau-notulen">' +
+      '<h5>A. Pokok-Pokok Materi</h5>' + (L.materi || []).map(function (m, i) {
+        return '<p style="margin:6px 0 0"><b>' + (i + 1) + '. ' + esc(m.narasumber || 'Narasumber') + (m.judul ? ' — ' + esc(m.judul) : '') + '</b></p>' + ul(m.poin);
+      }).join('') +
+      ((L.diskusi || []).some(function (q) { return q.pertanyaan; }) ? '<h5>B. Diskusi dan Tanya Jawab</h5>' + L.diskusi.filter(function (q) { return q.pertanyaan; }).map(function (q, i) {
+        return '<p style="margin:8px 0 0"><b>' + (i + 1) + '. Pertanyaan dari <span style="color:var(--teal-tua)">' + esc(q.penanya || 'Peserta') + '</span></b></p>' +
+          '<p style="margin:0 0 0 18px;font-style:italic">' + esc(H.rapikanKalimat(q.pertanyaan)) + '</p>' +
+          (q.jawaban ? '<p style="margin:2px 0 0 18px"><b>Tanggapan' + (q.penjawab ? ' ' + esc(q.penjawab) : '') + ':</b></p><div style="margin-left:18px">' + ul(q.jawaban) + '</div>' : '');
+      }).join('') : '') +
+      '<h5>Kesimpulan</h5>' + ol(L.kesimpulan) + '</div>';
+    H.dialog('Pratinjau notulensi (seperti di laporan)', html);
+  }
+
+  /* =================== DOKUMENTASI =================== */
+  var FOTO = {};
+  async function tabDokumentasi(k) {
+    var wadah = $('isi-tab');
+    wadah.innerHTML = '<div class="muat"><span class="putar"></span> Memuat dokumentasi…</div>';
+    var d;
+    try { d = LAP[k.id] || await muatLaporan(k); } catch (e) { wadah.innerHTML = '<div class="pesan galat">' + esc(e.message) + '</div>'; return; }
+    var L = d.laporan || {}; L.foto = L.foto || { tataLetak: 3, keterangan: '' };
+    var foto = d.berkas.filter(function (b) { return b.jenis === 'foto'; });
+    wadah.innerHTML =
+      '<div class="kartu"><div class="baris antara"><h3 style="margin:0">📷 Foto dokumentasi (' + foto.length + ')</h3>' +
+      '<label class="tbl">＋ Tambah foto<input type="file" accept="image/*" multiple hidden id="in-foto"></label></div>' +
+      '<p class="sub kecil" style="margin-top:6px">Pilih banyak foto sekaligus. Foto diperkecil otomatis (±300 KB) agar laporan tidak berat. Urutkan dengan tombol ← →.</p>' +
+      '<div id="galeri" class="galeri"></div></div>' +
+      '<div class="kartu"><h3>Tata letak di laporan</h3>' +
+      '<div class="pilihan" id="tata-letak" style="margin-bottom:12px">' +
+      '<label><input type="radio" name="tl" value="3"' + (Number(L.foto.tataLetak) !== 4 ? ' checked' : '') + '> 3 foto per halaman (besar)</label>' +
+      '<label><input type="radio" name="tl" value="4"' + (Number(L.foto.tataLetak) === 4 ? ' checked' : '') + '> 4 foto per halaman (2 × 2)</label></div>' +
+      '<label class="f"><span>Keterangan foto (satu untuk semua halaman dokumentasi)</span><input type="text" id="ket-foto" value="' + esc(L.foto.keterangan) + '" placeholder="Dokumentasi ' + esc(k.nama) + ', ' + esc(H.tglPanjang(k.tanggal)) + '"></label>' +
+      '<button class="tbl" id="simpan-tl">💾 Simpan tata letak</button></div>';
+
+    async function gambarGaleri() {
+      var g = $('galeri'); if (!g) return;
+      if (!foto.length) { g.innerHTML = '<div class="kosong kecil" style="grid-column:1/-1">Belum ada foto.</div>'; return; }
+      g.innerHTML = foto.map(function (f, i) {
+        return '<figure data-id="' + f.id + '"><span class="no-foto">' + (i + 1) + '</span><img alt="" ' + (FOTO[f.id] ? 'src="' + FOTO[f.id] + '"' : '') + '>' +
+          '<div class="aksi-foto"><span><button class="tbl garis ikon kecil" data-geser="-1" title="Geser kiri">←</button> <button class="tbl garis ikon kecil" data-geser="1" title="Geser kanan">→</button></span>' +
+          '<button class="tbl bahaya ikon kecil" data-hapus="1" title="Hapus">✕</button></div></figure>';
+      }).join('');
+      for (var i = 0; i < foto.length; i++) {
+        var f = foto[i];
+        if (FOTO[f.id]) continue;
+        try {
+          var r = await H.api('ambilBerkas', { id: f.id });
+          if (r.ok) { FOTO[f.id] = 'data:' + r.mime + ';base64,' + r.data; var im = g.querySelector('[data-id="' + f.id + '"] img'); if (im) im.src = FOTO[f.id]; }
+        } catch (e) { }
+      }
+    }
+    gambarGaleri();
+    $('galeri').onclick = async function (e) {
+      var b = e.target.closest('button'); if (!b) return;
+      var id = b.closest('figure').dataset.id, i = foto.findIndex(function (x) { return x.id === id; });
+      if (b.dataset.hapus) {
+        if (!await H.konfirmasi('Hapus foto?', 'Foto ini akan dihapus dari dokumentasi kegiatan.', 'Hapus', true)) return;
+        var r = await H.api('hapusBerkas', { id: id }); if (!r.ok) return H.toast(r.pesan, true);
+        d.berkas = r.berkas; foto = r.berkas.filter(function (x) { return x.jenis === 'foto'; }); $('isi-tab').querySelector('h3').textContent = '📷 Foto dokumentasi (' + foto.length + ')'; gambarGaleri();
+      } else if (b.dataset.geser) {
+        var j = i + Number(b.dataset.geser); if (j < 0 || j >= foto.length) return;
+        var t = foto[i]; foto[i] = foto[j]; foto[j] = t; gambarGaleri();
+        var r2 = await H.api('urutBerkas', { k: k.id, ids: foto.map(function (x) { return x.id; }) });
+        if (r2.ok) d.berkas = r2.berkas;
+      }
+    };
+    $('in-foto').onchange = async function () {
+      var files = Array.from(this.files); this.value = '';
+      for (var i = 0; i < files.length; i++) {
+        H.toast('Mengunggah foto ' + (i + 1) + '/' + files.length + '…');
+        try {
+          var g = await H.kecilkanGambar(files[i], 1600, 0.82);
+          var r = await H.api('unggahBerkas', { k: k.id, jenis: 'foto', nama: files[i].name.replace(/\.[^.]+$/, '') + '.jpg', mime: 'image/jpeg', data: g.dataUrl.split(',')[1] });
+          if (!r.ok) { H.toast(r.pesan, true); continue; }
+          d.berkas = r.berkas;
+          var baru = r.berkas.filter(function (x) { return x.jenis === 'foto'; });
+          baru.forEach(function (x) { if (!foto.some(function (y) { return y.id === x.id; })) FOTO[x.id] = g.dataUrl; });
+          foto = baru;
+          $('isi-tab').querySelector('h3').textContent = '📷 Foto dokumentasi (' + foto.length + ')';
+          gambarGaleri();
+        } catch (e) { H.toast(e.message, true); }
+      }
+      H.toast('Selesai mengunggah ' + files.length + ' foto.');
+    };
+    $('simpan-tl').onclick = async function () {
+      var data = Object.assign({}, d.laporan || {});
+      data.foto = { tataLetak: Number((document.querySelector('#tata-letak input:checked') || {}).value) || 3, keterangan: $('ket-foto').value.trim() };
+      var r = await H.api('simpanLaporan', { k: k.id, data: data });
+      if (!r.ok) return H.toast(r.pesan, true);
+      d.laporan = data; H.toast('Tata letak dokumentasi tersimpan.');
+    };
+  }
+
+  /* =================== MATERI =================== */
+  async function tabMateri(k) {
+    var wadah = $('isi-tab');
+    wadah.innerHTML = '<div class="muat"><span class="putar"></span> Memuat materi…</div>';
+    var d;
+    try { d = LAP[k.id] || await muatLaporan(k); } catch (e) { wadah.innerHTML = '<div class="pesan galat">' + esc(e.message) + '</div>'; return; }
+    var link = (H.CFG.URL_APLIKASI || '') + 'materi.html?k=' + encodeURIComponent(k.id);
+    function ikon(m, n) { n = String(n).toLowerCase(); return /pdf/.test(m) || /\.pdf$/.test(n) ? '📕' : /presentation|powerpoint/.test(m) || /\.pptx?$/.test(n) ? '📙' : /word|document/.test(m) || /\.docx?$/.test(n) ? '📘' : '📄'; }
+    function gambar() {
+      var materi = d.berkas.filter(function (b) { return b.jenis === 'materi'; });
+      wadah.innerHTML =
+        '<div class="kartu"><h3>⬆️ Unggah materi narasumber</h3><p class="sub kecil">PPT, PDF, atau Word · maks. 20 MB per file. Peserta dapat mengunduh setelah mengisi daftar hadir dan di menu Gizi-Link.</p>' +
+        '<div class="grid2"><label class="f"><span>Narasumber</span><select id="m-nara">' + d.narasumber.map(function (n) { return '<option>' + esc(n) + '</option>'; }).join('') + '<option value="">Lainnya / umum</option></select></label>' +
+        '<label class="f"><span>File materi</span><input type="file" id="m-file" accept=".pdf,.ppt,.pptx,.doc,.docx,application/pdf,application/vnd.ms-powerpoint,application/vnd.openxmlformats-officedocument.presentationml.presentation,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"></label></div>' +
+        '<button class="tbl" id="m-unggah">⬆️ Unggah</button> <span class="kecil" id="m-status"></span></div>' +
+        '<div class="kartu"><div class="baris antara"><h3 style="margin:0">📚 Materi (' + materi.length + ')</h3>' +
+        (materi.length ? '<div class="baris"><button class="tbl garis kecil" id="m-salin">🔗 Salin link materi</button><a class="tbl wa kecil" target="_blank" rel="noopener" href="https://wa.me/?text=' +
+          encodeURIComponent('*Materi ' + k.nama + '*\nSilakan unduh materi narasumber melalui link berikut:\n' + link) + '">💬 Bagikan ke WA</a></div>' : '') + '</div>' +
+        (materi.length ? '<div class="daftar-materi mt">' + materi.map(function (m) {
+          return '<div class="materi-item"><span class="ikon">' + ikon(m.mime, m.nama) + '</span><div class="info"><b>' + esc(m.nama) + '</b><span class="kecil">' + esc(m.narasumber || 'Umum') + ' · ' + esc(H.ukuranFile(m.ukuran)) + '</span></div>' +
+            '<button class="tbl lembut kecil" data-unduh="' + m.id + '">⬇️</button><button class="tbl bahaya kecil" data-hapus="' + m.id + '">✕</button></div>';
+        }).join('') + '</div>' : '<div class="kosong kecil">Belum ada materi.</div>') + '</div>';
+      $('m-unggah').onclick = unggah;
+      if ($('m-salin')) $('m-salin').onclick = function () { navigator.clipboard.writeText(link).then(function () { H.toast('Link materi tersalin.'); }); };
+      wadah.querySelectorAll('[data-unduh]').forEach(function (b) {
+        b.onclick = async function () {
+          b.disabled = true;
+          try { var r = await H.api('ambilBerkas', { id: b.dataset.unduh }); if (!r.ok) return H.toast(r.pesan, true); H.unduhBytes(H.base64KeBytes(r.data), r.nama, r.mime); }
+          catch (e) { H.toast(e.message, true); } finally { b.disabled = false; }
+        };
+      });
+      wadah.querySelectorAll('[data-hapus]').forEach(function (b) {
+        b.onclick = async function () {
+          if (!await H.konfirmasi('Hapus materi?', 'File materi ini akan dihapus dan tidak bisa diunduh peserta lagi.', 'Hapus', true)) return;
+          var r = await H.api('hapusBerkas', { id: b.dataset.hapus }); if (!r.ok) return H.toast(r.pesan, true);
+          d.berkas = r.berkas; gambar();
+        };
+      });
+    }
+    async function unggah() {
+      var f = $('m-file').files[0];
+      if (!f) return H.toast('Pilih file materi dulu.', true);
+      if (!/\.(pdf|pptx?|docx?)$/i.test(f.name)) return H.toast('Format harus PDF, PPT/PPTX, atau DOC/DOCX.', true);
+      if (f.size > 20 * 1024 * 1024) return H.toast('File terlalu besar (maks. 20 MB).', true);
+      var b = $('m-unggah'); b.disabled = true; $('m-status').textContent = 'Mengunggah ' + H.ukuranFile(f.size) + '… (jangan tutup halaman)';
+      try {
+        var data = await H.fileKeBase64(f);
+        var r = await H.api('unggahBerkas', { k: k.id, jenis: 'materi', nama: f.name, mime: f.type || 'application/octet-stream', data: data, narasumber: $('m-nara').value });
+        if (!r.ok) { H.toast(r.pesan, true); return; }
+        d.berkas = r.berkas; H.toast('Materi terunggah.'); gambar();
+      } catch (e) { H.toast(e.message, true); }
+      finally { if ($('m-unggah')) { $('m-unggah').disabled = false; $('m-status').textContent = ''; } }
+    }
+    gambar();
+  }
+
+  /* =================== EVALUASI =================== */
+  async function tabEvaluasi(k) {
+    var wadah = $('isi-tab');
+    if (!k.evaluasi) {
+      wadah.innerHTML = '<div class="kartu kosong"><span class="em">⭐</span><p>Evaluasi kepuasan peserta <b>tidak diaktifkan</b> untuk kegiatan ini.</p><a class="tbl garis" href="#/edit/' + esc(k.id) + '">Aktifkan di pengaturan kegiatan</a></div>';
+      return;
+    }
+    wadah.innerHTML = '<div class="muat"><span class="putar"></span> Menghitung hasil evaluasi…</div>';
+    var d;
+    try { d = await muatLaporan(k); } catch (e) { wadah.innerHTML = '<div class="pesan galat">' + esc(e.message) + '</div>'; return; }
+    var r = Laporan.ringkasEvaluasi(d.evaluasi, d.aspek, d.narasumber);
+    if (!r.n) { wadah.innerHTML = '<div class="kartu kosong"><span class="em">⭐</span>Belum ada peserta yang mengisi evaluasi.</div>'; return; }
+    var barisNilai = function (x) {
+      return '<div class="baris-nilai"><span>' + esc(x.label) + '</span><div class="batang"><i style="width:' + (x.rata / 5 * 100) + '%"></i></div><b>' + Laporan.koma(x.rata) + '</b></div>';
+    };
+    wadah.innerHTML =
+      '<div class="statistik"><div class="stat"><b>' + r.n + '</b><span>Responden</span></div><div class="stat"><b>' + Laporan.koma(r.indeks) + '</b><span>Indeks kepuasan (1–5)</span></div>' +
+      '<div class="stat"><b style="font-size:18px">' + esc(r.kategori) + '</b><span>Kategori</span></div><div class="stat"><b>' + r.saran.length + '</b><span>Saran tertulis</span></div></div>' +
+      '<div class="kartu"><h3>Penilaian per aspek</h3>' + r.aspek.map(barisNilai).join('') + '</div>' +
+      (r.narasumber.length ? '<div class="kartu"><h3>Penilaian narasumber</h3>' + r.narasumber.map(barisNilai).join('') + '</div>' : '') +
+      '<div class="kartu"><h3>Saran peserta</h3>' + (r.saran.length ? '<ul>' + r.saran.map(function (s) { return '<li>' + esc(s) + '</li>'; }).join('') + '</ul>' : '<p class="kecil">Belum ada saran.</p>') + '</div>' +
+      '<p class="kecil">Kategori: 4,21–5,00 Sangat Baik · 3,41–4,20 Baik · 2,61–3,40 Cukup · 1,81–2,60 Kurang · 1,00–1,80 Sangat Kurang.</p>';
   }
 
   mulai();

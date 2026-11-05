@@ -115,6 +115,88 @@
     return String(t || '').split(/\s+(?=\d{1,2}[.)]\s)/).map(esc).join('<br>');
   }
 
+  /** "1. A 2. B" / per baris / titik koma → ['A','B'] (sama dengan server). */
+  function daftarNarasumber(t) {
+    var s = String(t || '').replace(/\r/g, '').trim();
+    if (!s) return [];
+    var bagian = /\n/.test(s) ? s.split('\n') : s.split(/\s+(?=\d{1,2}[.)]\s)|;\s*/);
+    return bagian.map(function (x) { return x.replace(/^\s*\d{1,2}[.)]\s*/, '').trim(); }).filter(Boolean);
+  }
+
+  /** Teks bebas → daftar poin rapi: buang nomor/bullet, spasi ganda, huruf awal kapital, titik di akhir. */
+  function rapikanPoin(t) {
+    return String(t || '').replace(/\r/g, '').split('\n').map(rapikanKalimat).filter(Boolean);
+  }
+  function rapikanKalimat(x) {
+    x = String(x || '').replace(/^\s*(?:[-•*–·]|\d{1,2}[.)]|[a-zA-Z][.)])\s+/, '').replace(/\s+/g, ' ').trim();
+    if (!x) return '';
+    x = x.charAt(0).toUpperCase() + x.slice(1);
+    if (!/[.!?:;)"”']$/.test(x)) x += '.';
+    return x;
+  }
+
+  /** ID perangkat acak (untuk pembatasan salah kode). */
+  function perangkat() {
+    try {
+      var v = localStorage.getItem('hadir_perangkat');
+      if (!v) { v = Math.random().toString(36).slice(2) + Date.now().toString(36); localStorage.setItem('hadir_perangkat', v); }
+      return v;
+    } catch (e) { return 'tanpa-penyimpanan'; }
+  }
+
+  /** Perkecil foto → data URL JPEG. */
+  function kecilkanGambar(file, maks, q) {
+    return new Promise(function (res, rej) {
+      var url = URL.createObjectURL(file), im = new Image();
+      im.onload = function () {
+        var s = Math.min(1, (maks || 1600) / Math.max(im.width, im.height));
+        var c = document.createElement('canvas');
+        c.width = Math.round(im.width * s); c.height = Math.round(im.height * s);
+        var x = c.getContext('2d'); x.fillStyle = '#fff'; x.fillRect(0, 0, c.width, c.height); x.drawImage(im, 0, 0, c.width, c.height);
+        URL.revokeObjectURL(url);
+        res({ dataUrl: c.toDataURL('image/jpeg', q || 0.82), w: c.width, h: c.height });
+      };
+      im.onerror = function () { URL.revokeObjectURL(url); rej(new Error('File ' + file.name + ' bukan gambar yang dapat dibaca.')); };
+      im.src = url;
+    });
+  }
+
+  function fileKeBase64(file) {
+    return new Promise(function (res, rej) {
+      var r = new FileReader();
+      r.onload = function () { res(String(r.result).replace(/^data:[^;]*;base64,/, '')); };
+      r.onerror = function () { rej(new Error('File tidak dapat dibaca.')); };
+      r.readAsDataURL(file);
+    });
+  }
+
+  function ukuranFile(n) {
+    n = Number(n) || 0;
+    return n > 1048576 ? (n / 1048576).toFixed(1).replace('.', ',') + ' MB' : Math.max(1, Math.round(n / 1024)) + ' KB';
+  }
+
+  /** Kotak bintang 1–5. Mengembalikan elemen; nilai di el.dataset.nilai */
+  function bintang(label, onUbah) {
+    var el = document.createElement('div');
+    el.className = 'bintang-baris';
+    el.dataset.nilai = '';
+    el.innerHTML = '<span class="bintang-label">' + esc(label) + '</span><span class="bintang" role="radiogroup" aria-label="' + esc(label) + '">' +
+      [1, 2, 3, 4, 5].map(function (n) { return '<button type="button" role="radio" aria-label="' + n + ' bintang" data-n="' + n + '">★</button>'; }).join('') +
+      '</span><span class="bintang-ket"></span>';
+    var KET = ['', 'Sangat kurang', 'Kurang', 'Cukup', 'Baik', 'Sangat baik'];
+    el.querySelectorAll('button').forEach(function (b) {
+      b.onclick = function () {
+        var n = Number(b.dataset.n);
+        el.dataset.nilai = n;
+        el.querySelectorAll('button').forEach(function (x) { x.classList.toggle('isi', Number(x.dataset.n) <= n); x.setAttribute('aria-checked', Number(x.dataset.n) === n); });
+        el.querySelector('.bintang-ket').textContent = KET[n];
+        el.classList.remove('kurang');
+        if (onUbah) onUbah();
+      };
+    });
+    return el;
+  }
+
   function labelAbsen(s) {
     return { buka: '<span class="lbl buka">Absen dibuka</span>', belum: '<span class="lbl belum">Belum dibuka</span>', tutup: '<span class="lbl tutup">Ditutup</span>' }[s] || '';
   }
@@ -240,7 +322,9 @@
   w.Hadir = {
     CFG: CFG, SASARAN: SASARAN, PRODI_MHS: PRODI_MHS, JENIS: JENIS, POSISI_BAWAAN: POSISI_BAWAAN,
     $: $, esc: esc, api: api, toast: toast, dialog: dialog, konfirmasi: konfirmasi,
-    narasumberHtml: narasumberHtml, tglPanjang: tglPanjang, waktuPanjang: waktuPanjang, jam: jam, labelAbsen: labelAbsen, labelMode: labelMode,
+    narasumberHtml: narasumberHtml, daftarNarasumber: daftarNarasumber, rapikanPoin: rapikanPoin, rapikanKalimat: rapikanKalimat,
+    perangkat: perangkat, kecilkanGambar: kecilkanGambar, fileKeBase64: fileKeBase64, ukuranFile: ukuranFile, bintang: bintang,
+    tglPanjang: tglPanjang, waktuPanjang: waktuPanjang, jam: jam, labelAbsen: labelAbsen, labelMode: labelMode,
     namaSertifikat: namaSertifikat, buatSertifikat: buatSertifikat, base64KeBytes: base64KeBytes, bytesKeBase64: bytesKeBase64,
     unduhBytes: unduhBytes, namaFile: namaFile, linkHadir: linkHadir, linkSertifikat: linkSertifikat, qrDataUrl: qrDataUrl
   };

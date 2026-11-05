@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="id">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Materi Narasumber · Jurusan Gizi Poltekkes Kemenkes Makassar</title>
+  <meta name="theme-color" content="#00B8AD">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="icons/icon-192.png">
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap">
+  <link rel="stylesheet" href="css/style.css">
+  <script src="js/config.js"></script>
+  <script src="https://jurusan-gizi.github.io/sso.js"></script>
+</head>
+<body>
+  <header class="kop">
+    <div class="kop-isi">
+      <img src="logo.png" alt="Kemenkes Poltekkes Makassar" class="logo">
+      <div class="judul"><b>Materi Narasumber</b><span>Jurusan Gizi</span></div>
+    </div>
+  </header>
+  <main class="sempit" id="isi"><div class="muat"><span class="putar"></span> Memuat materi…</div></main>
+  <footer><p>Jurusan Gizi · Poltekkes Kemenkes Makassar</p></footer>
+  <script src="js/umum.js"></script>
+  <script>
+  (async function () {
+    var H = Hadir, $ = H.$, esc = H.esc, isi = $('isi');
+    var k = new URLSearchParams(location.search).get('k');
+    function ikon(m, n) {
+      n = String(n || '').toLowerCase();
+      if (/pdf/.test(m) || /\.pdf$/.test(n)) return '📕';
+      if (/presentation|powerpoint/.test(m) || /\.pptx?$/.test(n)) return '📙';
+      if (/word|document/.test(m) || /\.docx?$/.test(n)) return '📘';
+      return '📄';
+    }
+    try {
+      var d = await H.api('materi', { k: k }, { tanpaToken: true });
+      if (!d.ok) { isi.innerHTML = '<div class="kartu kosong"><span class="em">📚</span><p>' + esc(d.pesan) + '</p></div>'; return; }
+      isi.innerHTML = '<section class="pita"><p style="margin:0 0 4px;opacity:.85">Materi narasumber</p><h1>' + esc(d.kegiatan.nama) + '</h1>' +
+        '<div class="meta"><span>📅 ' + esc(H.tglPanjang(d.kegiatan.tanggal, true)) + '</span></div></section>' +
+        '<div class="kartu">' + (d.materi.length ? '<div class="daftar-materi">' + d.materi.map(function (m) {
+          return '<div class="materi-item"><span class="ikon">' + ikon(m.mime, m.nama) + '</span><div class="info"><b>' + esc(m.nama) + '</b>' +
+            '<span class="kecil">' + (m.narasumber ? esc(m.narasumber) + ' · ' : '') + esc(H.ukuranFile(m.ukuran)) + '</span></div>' +
+            '<button class="tbl kecil" data-id="' + esc(m.id) + '">⬇️ Unduh</button></div>';
+        }).join('') + '</div>' : '<div class="kosong"><span class="em">📚</span>Materi belum diunggah panitia.</div>') + '</div>';
+      isi.querySelectorAll('[data-id]').forEach(function (b) {
+        b.onclick = async function () {
+          var asli = b.innerHTML; b.disabled = true; b.innerHTML = '<span class="putar kcl"></span> Mengunduh…';
+          try {
+            var r = await H.api('unduhMateri', { k: k, id: b.dataset.id }, { tanpaToken: true });
+            if (!r.ok) return H.toast(r.pesan, true);
+            H.unduhBytes(H.base64KeBytes(r.data), r.nama, r.mime);
+          } catch (e) { H.toast(e.message, true); }
+          finally { b.disabled = false; b.innerHTML = asli; }
+        };
+      });
+    } catch (e) { isi.innerHTML = '<div class="kartu kosong"><span class="em">⚠️</span><p>' + esc(e.message) + '</p></div>'; }
+  })();
+  </script>
+</body>
+</html>

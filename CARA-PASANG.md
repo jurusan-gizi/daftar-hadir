@@ -77,3 +77,26 @@ Kolom `badge_api` membuat kartu menu menampilkan jumlah daftar hadir yang sedang
 - **Mengubah tampilan/kode** → setelah mengedit `Code.gs`: **Terapkan → Kelola deployment → ✏️ → Versi: Versi baru → Terapkan** (URL tetap sama).
 - **Pengesahan rekap** (nama/NIP Kajur) dapat diubah super admin di menu **⚙️ Pengaturan**.
 - Data tanda tangan disimpan di tab **TTD** (terpisah agar tab Kehadiran tetap ringan).
+
+---
+
+## Pembaruan: Notulensi, Evaluasi, Dokumentasi, Materi & Laporan
+
+1. **Apps Script** → ganti seluruh `Code.gs` → Simpan → **Terapkan → Kelola deployment → ✏️ → Versi baru → Terapkan**.
+   Tab baru (**Evaluasi, Laporan, Berkas**) dan kolom baru dibuat otomatis saat pertama dipakai. Saat pertama kali menyimpan, Google meminta izin akses Drive lagi bila perlu.
+2. **GitHub** → unggah seluruh isi folder `daftar-hadir` (timpa file lama). `js/config.js` sudah berisi URL Apps Script Anda.
+3. Muat ulang aplikasi dengan **Ctrl + Shift + R**.
+
+### Sekali saja (super admin)
+**⚙️ Pengaturan → Tanda tangan & stempel pengesah** → unggah foto/scan tanda tangan dan stempel di kertas putih. Latar putih dibuang otomatis.
+
+### Alur kegiatan
+| Saat | Menu | Yang dilakukan |
+|---|---|---|
+| Sebelum | Ubah kegiatan | Centang 🔐 kode kehadiran & ⭐ evaluasi (otomatis tercentang untuk kegiatan baru). Tulis narasumber bernomor: `1. Nama 2. Nama` |
+| Sebelum/selama | 📚 Materi | Unggah PPT/PDF/Word per narasumber (maks. 20 MB) |
+| Selama | 📝 Notulensi | Isi pokok materi (satu poin per baris) & kartu tanya jawab |
+| Akhir acara | Halaman kegiatan | **Tampilkan layar penuh** kode kehadiran, lalu **Tutup sekarang** setelah selesai |
+| Setelah | 📷 Dokumentasi | Unggah foto, pilih 3 atau 4 foto per halaman, isi satu keterangan |
+| Setelah | 📝 Notulensi | **Cocokkan nama dengan daftar hadir**, ✨ draf kesimpulan & rekomendasi |
+| Setelah | 📑 Rekap & Laporan | **Unduh Word** atau **Versi Cetak / PDF** |
