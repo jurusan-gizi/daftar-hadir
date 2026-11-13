@@ -868,7 +868,7 @@
   }
 
   /* =================== NOTULENSI =================== */
-  var LAP = {};
+  var LAP = {}, notulenOnline = null, notulenUlang = null;
   async function muatLaporan(k, denganNama) {
     var d = await H.api('ambilLaporan', { k: k.id, denganNama: !!denganNama });
     if (!d.ok) throw new Error(d.pesan);
@@ -955,9 +955,10 @@
     }
     gambarMateri(); gambarDiskusi(); gambarRtl();
 
-    var kotor = false, tunda = null;
+    var kotor = false, tunda = null, sedangSimpan = false, ubahTerakhir = 0;
+    if (draf && L === draf.data) kotor = true;   // draf pulihan belum ada di server → kirim otomatis
     function berubah() {
-      kotor = true; $('n-status').textContent = 'Ada perubahan…';
+      kotor = true; ubahTerakhir = Date.now(); $('n-status').textContent = 'Ada perubahan…';
       try { localStorage.setItem('notulen_' + k.id, JSON.stringify({ t: Date.now(), data: kumpulkan() })); } catch (e) { }
       clearTimeout(tunda); tunda = setTimeout(simpan, 4000);
     }
@@ -965,18 +966,39 @@
       clearTimeout(tunda);
       if (!$('n-status')) return;
       if (!kotor && !manual) return;
+      if (sedangSimpan) return;
+      sedangSimpan = true;
+      try { await simpanInti(manual); } finally { sedangSimpan = false; }
+    }
+    async function simpanInti(manual) {
       var data = kumpulkan();
       data.foto = (LAP[k.id] && LAP[k.id].laporan && LAP[k.id].laporan.foto) || data.foto;
       $('n-status').textContent = 'Menyimpan…';
+      var mulaiSimpan = Date.now();
       try {
         var r = await H.api('simpanLaporan', { k: k.id, data: data });
         if (!r.ok) { $('n-status').textContent = '⚠️ ' + r.pesan; return; }
-        kotor = false; LAP[k.id].laporan = data; LAP[k.id].diubahPada = r.diubahPada;
-        try { localStorage.removeItem('notulen_' + k.id); } catch (e) { }
+        LAP[k.id].laporan = data; LAP[k.id].diubahPada = r.diubahPada;
+        if (ubahTerakhir <= mulaiSimpan) { kotor = false; try { localStorage.removeItem('notulen_' + k.id); } catch (e) { } }
+        else { tunda = setTimeout(simpan, 4000); }   // ada ketikan baru selama proses simpan
         if ($('n-status')) $('n-status').textContent = '✔ Tersimpan ' + r.diubahPada;
         if (manual) H.toast('Notulensi tersimpan.');
-      } catch (e) { if ($('n-status')) $('n-status').textContent = '⚠️ Gagal menyimpan — draf aman di perangkat ini. ' + e.message; }
+      } catch (e) {
+        if ($('n-status')) $('n-status').textContent = navigator.onLine === false
+          ? '📴 Internet terputus — draf aman di perangkat ini, dikirim otomatis saat tersambung lagi.'
+          : '⚠️ Belum tersimpan ke server — draf aman di perangkat ini, mencoba lagi otomatis…';
+      }
     }
+    // Kirim ulang otomatis: saat internet tersambung lagi, dan tiap 15 detik selama masih ada perubahan yang belum terkirim
+    if (notulenOnline) window.removeEventListener('online', notulenOnline);
+    if (notulenUlang) clearInterval(notulenUlang);
+    notulenOnline = function () { if ($('n-status') && kotor) { H.toast('Internet tersambung — mengirim notulensi…'); simpan(); } };
+    window.addEventListener('online', notulenOnline);
+    window.addEventListener('offline', function () { if ($('n-status')) $('n-status').textContent = '📴 Internet terputus — lanjutkan mengetik, draf aman di perangkat ini.'; }, { once: true });
+    notulenUlang = setInterval(function () {
+      if (!$('n-status')) { clearInterval(notulenUlang); notulenUlang = null; return; }
+      if (kotor && !sedangSimpan && navigator.onLine !== false && Date.now() - ubahTerakhir > 5000) simpan();
+    }, 15000);
     wadah.addEventListener('input', berubah);
     wadah.addEventListener('click', function (e) {
       var b = e.target.closest('button'); if (!b) return;
