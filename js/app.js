@@ -49,6 +49,45 @@
         if (d.kode === 'AUTH') return galat(d.pesan, '<button class="tbl" onclick="GiziSSO.masuk()">Masuk lagi</button>');
         return galat(d.pesan);
       }
+      SAYA = d;
+      if (!dengarMhs) { dengarMhs = true; window.addEventListener('hashchange', function () { if (timer) { clearInterval(timer); timer = null; } ruteMhs(); }); }
+      ruteMhs();
+    } catch (e) { galat(e.message); }
+  }
+
+  var SAYA = null, dengarMhs = false;
+  function ruteMhs() {
+    var h = location.hash.replace(/^#\/?/, '').split('/');
+    window.scrollTo(0, 0);
+    if (h[0] === 'n') {
+      var k = (SAYA.tugasNotulis || []).filter(function (x) { return x.id === h[1]; })[0];
+      if (k) return halamanNotulis(k, h[2] || 'notulensi');
+    }
+    berandaMhs(SAYA);
+  }
+
+  /** Halaman kerja notulis (mahasiswa yang ditunjuk admin): hanya Notulensi, Dokumentasi, Materi. */
+  function halamanNotulis(k, tab) {
+    var tabs = [['notulensi', '📝 Notulensi'], ['dokumentasi', '📷 Dokumentasi'], ['materi', '📚 Materi']];
+    isi.innerHTML =
+      '<div class="baris" style="margin-bottom:12px"><a class="tbl garis kecil" href="#/">← Kembali</a></div>' +
+      '<section class="pita"><p style="margin:0 0 4px;opacity:.85">📝 Tugas Notulis · ' + esc(k.jenis || 'Kegiatan') + '</p><h1>' + esc(k.nama) + '</h1><div class="meta">' +
+      '<span>📅 ' + esc(H.tglPanjang(k.tanggal, true)) + (k.waktu ? ', ' + esc(k.waktu) : '') + '</span>' + (k.tempat ? '<span>📍 ' + esc(k.tempat) + '</span>' : '') +
+      (k.narasumber ? '<span>🎤 ' + H.narasumberHtml(k.narasumber) + '</span>' : '') + '</div></section>' +
+      '<div class="pesan info">Anda ditugaskan sebagai <b>notulis</b> kegiatan ini. Akses berlaku sampai <b>' + esc(H.tglPanjang(k.aksesSampai)) + '</b>.</div>' +
+      '<div class="tab tab3" id="tab">' + tabs.map(function (t) { return '<button data-t="' + t[0] + '"' + (t[0] === tab ? ' class="aktif"' : '') + '>' + t[1] + '</button>'; }).join('') + '</div>' +
+      '<div id="isi-tab"></div>';
+    $('tab').onclick = function (e) { var b = e.target.closest('button'); if (b) location.hash = '#/n/' + k.id + '/' + b.dataset.t; };
+    ({ notulensi: tabNotulensi, dokumentasi: tabDokumentasi, materi: tabMateri }[tab] || tabNotulensi)(k);
+  }
+
+  function berandaMhs(d) {
+    {
+      var tugas = (d.tugasNotulis || []).map(function (k) {
+        return '<div class="keg" style="border-top-color:var(--lime)"><div class="baris antara"><span class="chip">' + esc(k.jenis || 'Kegiatan') + '</span><span class="lbl lime">Notulis</span></div>' +
+          '<h4>' + esc(k.nama) + '</h4><div class="meta">📅 ' + esc(H.tglPanjang(k.tanggal, true)) + (k.tempat ? ' · 📍 ' + esc(k.tempat) : '') + '</div>' +
+          '<div class="bawah"><span class="kecil">Akses s.d. ' + esc(H.tglPanjang(k.aksesSampai)) + '</span><a class="tbl kecil" href="#/n/' + esc(k.id) + '/notulensi">📝 Buka Notulensi</a></div></div>';
+      }).join('');
       var buka = d.dibuka.map(function (k) {
         return '<div class="keg"><div class="baris antara"><span class="chip">' + esc(k.jenis || 'Kegiatan') + '</span>' + H.labelAbsen(k.absen) + '</div>' +
           '<h4>' + esc(k.nama) + '</h4><div class="meta">📅 ' + esc(H.tglPanjang(k.tanggal, true)) + (k.tempat ? ' · 📍 ' + esc(k.tempat) : '') + '</div>' +
@@ -64,12 +103,13 @@
       }).join('');
       isi.innerHTML =
         '<section class="pita"><h1>Halo, ' + esc(d.profil.nama) + '</h1><p>' + esc(d.profil.nim) + ' · ' + esc(d.profil.prodi) + '</p></section>' +
+        (tugas ? '<div class="kartu"><h3>📝 Tugas Notulis</h3><p class="sub kecil">Isi notulensi, unggah foto dokumentasi, dan materi narasumber untuk kegiatan berikut.</p><div class="daftar-keg">' + tugas + '</div></div>' : '') +
         '<div class="kartu"><h3>Daftar hadir yang sedang dibuka</h3>' +
         (buka ? '<div class="daftar-keg">' + buka + '</div>' : '<div class="kosong"><span class="em">📭</span>Belum ada daftar hadir yang dibuka untuk prodi Anda.</div>') + '</div>' +
         '<div class="kartu"><h3>Riwayat kehadiran & sertifikat</h3>' +
         (riw ? '<div class="tabel-wrap"><table class="tabel"><thead><tr><th>Kegiatan</th><th>Waktu hadir</th><th></th></tr></thead><tbody>' + riw + '</tbody></table></div>' :
           '<div class="kosong"><span class="em">🗂️</span>Belum ada riwayat kehadiran.</div>') + '</div>';
-    } catch (e) { galat(e.message); }
+    }
   }
 
   /* =================== ADMIN =================== */
@@ -181,6 +221,10 @@
         return '<label><input type="radio" name="mode" value="' + m[0] + '"' + (k.modeSertifikat === m[0] ? ' checked' : '') + '> ' + m[1] + '</label>';
       }).join('') + '</div>' +
       '<p class="kecil" style="margin:0 0 16px">PDF sertifikat dari SRIKANDI diunggah di tab <b>Sertifikat</b> setelah kegiatan disimpan.</p>' +
+      '<label class="f"><span>📝 Notulis (mahasiswa) <em class="kecil" style="font-style:normal;font-weight:400">— opsional, maks. 5</em></span>' +
+      '<div class="link-kotak"><input type="text" id="f-nim-not" autocomplete="off" placeholder="Ketik NIM mahasiswa lalu tekan Tambah"><button type="button" class="tbl lembut" id="f-tambah-not">Tambah</button></div>' +
+      '<small>Mahasiswa ini dapat mengisi Notulensi, Dokumentasi, dan Materi kegiatan lewat akun Gizi-Link-nya sampai 7 hari setelah kegiatan. Ia tidak melihat peserta, kode kehadiran, evaluasi, surat, maupun sertifikat.</small></label>' +
+      '<div id="f-notulis" style="margin:-4px 0 14px"></div>' +
       '<label class="f"><span>Pengamanan</span></label>' +
       '<div class="pilihan" style="margin-bottom:4px"><label><input type="checkbox" id="f-kode"' + (baru || k.wajibKode ? ' checked' : '') + '> 🔐 Wajib kode kehadiran</label></div>' +
       '<p class="kecil" style="margin:0 0 10px">Kode 4 angka diumumkan panitia di ruangan / layar Zoom. Orang yang hanya menerima link tanpa hadir tidak dapat mengisi.</p>' +
@@ -188,6 +232,30 @@
       '<p class="kecil" style="margin:0 0 16px">5 aspek + nilai per narasumber (bintang 1–5), wajib diisi peserta setelah kode kehadiran benar. Hasilnya masuk otomatis ke laporan.</p>' +
       '<button class="tbl penuh" id="f-simpan" type="submit">' + (baru ? 'Simpan & Lanjut' : 'Simpan Perubahan') + '</button>' +
       '</form>';
+
+    var notulis = (k.notulis || []).slice();
+    function gambarNotulis() {
+      $('f-notulis').innerHTML = notulis.map(function (n, i) {
+        return '<span class="chip" style="font-size:13px;padding:5px 9px">' + esc(n.nama) + ' · ' + esc(n.nim) + ' <a href="#" data-buang="' + i + '" style="color:var(--merah);text-decoration:none;margin-left:4px">✕</a></span>';
+      }).join('');
+    }
+    gambarNotulis();
+    $('f-notulis').onclick = function (e) { var a = e.target.closest('[data-buang]'); if (!a) return; e.preventDefault(); notulis.splice(Number(a.dataset.buang), 1); gambarNotulis(); };
+    async function tambahNotulis() {
+      var nim = $('f-nim-not').value.trim();
+      if (nim.length < 5) return H.toast('Ketik NIM mahasiswa dengan lengkap.', true);
+      if (notulis.length >= 5) return H.toast('Maksimal 5 notulis per kegiatan.', true);
+      var b = $('f-tambah-not'); b.disabled = true;
+      try {
+        var r = await H.api('cekNim', { nim: nim }, { tanpaToken: true });
+        if (!r.ok) return H.toast(r.pesan, true);
+        if (!r.ditemukan) return H.toast('NIM belum terdaftar di Gizi-Link, jadi mahasiswa ini belum bisa login.', true);
+        if (notulis.some(function (n) { return n.nim === r.nim; })) return H.toast('Mahasiswa ini sudah ada di daftar notulis.', true);
+        notulis.push({ nim: r.nim, nama: r.nama }); $('f-nim-not').value = ''; gambarNotulis();
+      } catch (e) { H.toast(e.message, true); } finally { b.disabled = false; }
+    }
+    $('f-tambah-not').onclick = tambahNotulis;
+    $('f-nim-not').addEventListener('keydown', function (e) { if (e.key === 'Enter') { e.preventDefault(); tambahNotulis(); } });
 
     // Isi otomatis jam absen saat tanggal dipilih
     $('f-tgl').addEventListener('change', function () {
@@ -204,8 +272,9 @@
         sasaran: [].map.call(document.querySelectorAll('#f-sasaran input:checked'), function (x) { return x.value; }),
         bukaAbsen: $('f-buka').value, tutupAbsen: $('f-tutup').value,
         modeSertifikat: (document.querySelector('#f-mode input:checked') || {}).value || 'tanpa',
-        wajibKode: $('f-kode').checked, evaluasi: $('f-eval').checked
+        wajibKode: $('f-kode').checked, evaluasi: $('f-eval').checked, notulis: notulis.map(function (n) { return n.nim; })
       };
+      if ($('f-nim-not').value.trim()) return H.toast('NIM notulis belum ditambahkan — tekan Tambah, atau kosongkan isiannya.', true);
       if (data.nama.trim().length < 3) return H.toast('Nama kegiatan wajib diisi.', true);
       if (!data.tanggal) return H.toast('Tanggal kegiatan wajib diisi.', true);
       if (!data.sasaran.length) return H.toast('Pilih minimal satu sasaran peserta.', true);
@@ -241,6 +310,8 @@
       '<div class="pilihan" id="status-absen">' + [['otomatis', 'Ikuti jadwal'], ['buka', 'Buka sekarang'], ['tutup', 'Tutup sekarang']].map(function (s) {
         return '<label><input type="radio" name="sa" value="' + s[0] + '"' + (k.statusAbsen === s[0] ? ' checked' : '') + '> ' + s[1] + '</label>';
       }).join('') + '</div></div>' +
+      ((k.notulis || []).length ? '<p class="kecil" style="margin:10px 0 0">📝 Notulis: <b>' + k.notulis.map(function (n) { return esc(n.nama); }).join(', ') + '</b> · akses s.d. ' + esc(H.tglPanjang(k.notulisSampai)) + '</p>' :
+        '<p class="kecil" style="margin:10px 0 0">📝 Notulis mahasiswa belum ditunjuk — <a href="#/edit/' + esc(k.id) + '">tunjuk di menu Ubah</a>.</p>') +
       (k.wajibKode ? '<div class="garis-atas baris antara"><div><span class="kecil">🔐 Kode kehadiran — umumkan di ruangan / layar Zoom, jangan dibagikan di grup</span>' +
         '<div style="font-size:34px;font-weight:800;letter-spacing:8px;color:var(--teal-tua);line-height:1.2" id="kode-tampil">' + esc(k.kodeHadir) + '</div></div>' +
         '<div class="baris"><button class="tbl" id="kode-layar">🖥️ Tampilkan layar penuh</button><button class="tbl garis" id="kode-ganti">🔄 Ganti kode</button></div></div>' : '') +
@@ -1013,7 +1084,7 @@
       g.innerHTML = foto.map(function (f, i) {
         return '<figure data-id="' + f.id + '"><span class="no-foto">' + (i + 1) + '</span><img alt="" ' + (FOTO[f.id] ? 'src="' + FOTO[f.id] + '"' : '') + '>' +
           '<div class="aksi-foto"><span><button class="tbl garis ikon kecil" data-geser="-1" title="Geser kiri">←</button> <button class="tbl garis ikon kecil" data-geser="1" title="Geser kanan">→</button></span>' +
-          '<button class="tbl bahaya ikon kecil" data-hapus="1" title="Hapus">✕</button></div></figure>';
+          (d.notulis && !f.milikSaya ? '' : '<button class="tbl bahaya ikon kecil" data-hapus="1" title="Hapus">✕</button>') + '</div></figure>';
       }).join('');
       for (var i = 0; i < foto.length; i++) {
         var f = foto[i];
@@ -1086,7 +1157,7 @@
           encodeURIComponent('*Materi ' + k.nama + '*\nSilakan unduh materi narasumber melalui link berikut:\n' + link) + '">💬 Bagikan ke WA</a></div>' : '') + '</div>' +
         (materi.length ? '<div class="daftar-materi mt">' + materi.map(function (m) {
           return '<div class="materi-item"><span class="ikon">' + ikon(m.mime, m.nama) + '</span><div class="info"><b>' + esc(m.nama) + '</b><span class="kecil">' + esc(m.narasumber || 'Umum') + ' · ' + esc(H.ukuranFile(m.ukuran)) + '</span></div>' +
-            '<button class="tbl lembut kecil" data-unduh="' + m.id + '">⬇️</button><button class="tbl bahaya kecil" data-hapus="' + m.id + '">✕</button></div>';
+            '<button class="tbl lembut kecil" data-unduh="' + m.id + '">⬇️</button>' + (d.notulis && !m.milikSaya ? '' : '<button class="tbl bahaya kecil" data-hapus="' + m.id + '">✕</button>') + '</div>';
         }).join('') + '</div>' : '<div class="kosong kecil">Belum ada materi.</div>') + '</div>';
       $('m-unggah').onclick = unggah;
       if ($('m-salin')) $('m-salin').onclick = function () { navigator.clipboard.writeText(link).then(function () { H.toast('Link materi tersalin.'); }); };

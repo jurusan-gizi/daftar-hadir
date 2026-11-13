@@ -302,3 +302,5 @@ table.tabel .aksi { white-space: nowrap; text-align: right; }
 .batang i { display: block; height: 100%; background: linear-gradient(90deg, var(--teal), var(--hijau)); border-radius: 999px; }
 .baris-nilai { display: grid; grid-template-columns: 1fr 160px 44px; gap: 10px; align-items: center; padding: 6px 0; font-size: 14px; }
 @media (max-width: 560px) { .baris-nilai { grid-template-columns: 1fr 90px 40px; } }
+
+.tab.tab3 { grid-template-columns: repeat(3, 1fr); }
